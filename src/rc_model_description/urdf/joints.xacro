@@ -1,0 +1,125 @@
+<?xml version="1.0"?>
+<robot name="rc_model" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+
+    <joint name="servo_angle" type="fixed">
+        <origin xyz="-0.015 0.0045 -0.018" rpy="0 0 0" />
+        <parent link="servo" />
+        <child link="servo_horn" />
+        <axis xyz="-0.0 -0.0 -1.0" />
+        <limit upper="0.488692" lower="-0.488692" effort="100" velocity="100" />
+    </joint>
+
+    <joint name="left_wheel_mount_turn" type="revolute">
+        <origin xyz="0.064 -0.028 -0.02575" rpy="0 0 0" />
+        <parent link="front_assembly" />
+        <child link="left_wheel_mount" />
+        <axis xyz="0.0 0.0 1.0" />
+        <dynamics damping="5.0"/>
+        <limit upper="0.488692" lower="-0.488692" effort="100" velocity="100" />
+        <!--<mimic joint="servo_angle" multiplier="-1" />-->
+    </joint>
+
+    <joint name="right_wheel_mount_turn" type="revolute">
+        <origin xyz="-0.064 -0.028 -0.02575" rpy="0 0 0" />
+        <parent link="front_assembly" />
+        <child link="right_wheel_mount" />
+        <axis xyz="0.0 0.0 1.0" />
+        <limit upper="0.488692" lower="-0.488692" effort="100" velocity="100" />
+        <dynamics damping="5.0"/>
+        <!--<mimic joint="servo_angle" multiplier="-1" />-->
+    </joint>
+
+    <joint name="suspension" type="fixed">
+        <origin xyz="-0.0 -0.06413 0.0" rpy="0 0 0" />
+        <parent link="suspension_axle" />
+        <child link="front_assembly" />
+        <axis xyz="0.0 -1.0 0.0" />
+        <limit upper="0.069813" lower="-0.069813" effort="100" velocity="100" />
+    </joint>
+
+    <joint name="imu" type="fixed">
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <parent link="suspension_axle" />
+        <child link="imu_link" />
+    </joint>
+
+    <joint name="lidar_joint" type="fixed">
+        <!-- <axis xyz="0 1 0" /> -->
+        <!-- <origin xyz="0 0 ${height3 - axel_offset/2}" rpy="0 0 0"/> -->
+        <origin xyz="0 0 0.075" rpy="0 0 -1.5707" />
+        <parent link="chassis_link"/>
+        <child link="lidar_link"/>
+    </joint>
+
+    <joint name="Rigid_278" type="fixed">
+        <origin xyz="0.0 0.09463 0.02275" rpy="0 0 0" />
+        <parent link="chassis_link" />
+        <child link="suspension_axle" />
+    </joint>
+
+    <joint name="Rigid_279" type="fixed">
+        <origin xyz="0.025 -0.0205 -0.02775" rpy="0 0 0" />
+        <parent link="front_assembly" />
+        <child link="servo" />
+    </joint>
+
+    <joint name="Rigid_280" type="fixed">
+        <origin xyz="0.063 0.18238 -0.003" rpy="0 0 0" />
+        <parent link="chassis_link" />
+        <child link="left_motor" />
+    </joint>
+
+    <joint name="Rigid_281" type="fixed">
+        <origin xyz="-0.063 0.18238 -0.003" rpy="0 0 0" />
+        <parent link="chassis_link" />
+        <child link="right_motor" />
+    </joint>
+
+    <joint name="front_right_wheel_joint" type="continuous">
+        <origin xyz="-0.0045 0.0 0.0" rpy="0 0 0" />
+        <parent link="right_wheel_mount" />
+        <child link="front_right_wheel" />
+        <axis xyz="1.0 0.0 0.0" />
+        <dynamics damping="0.0" friction="0.0"/>
+        <limit velocity="200" effort="1000000"/>
+    </joint>
+
+    <joint name="front_left_wheel_joint" type="continuous">
+        <origin xyz="0.0045 0.0 0.0" rpy="0 0 0" />
+        <parent link="left_wheel_mount" />
+        <child link="front_left_wheel" />
+        <axis xyz="1.0 0.0 -0.0" />
+        <dynamics damping="0.0" friction="0.0"/>
+        <limit velocity="200" effort="1000000"/>
+    </joint>
+
+    <joint name="back_right_wheel_joint" type="continuous">
+        <origin xyz="-0.0095 0.007 0.0" rpy="0 0 0" />
+        <parent link="right_motor" />
+        <child link="back_right_wheel" />
+        <axis xyz="1.0 0.0 0.0" />
+    </joint>
+
+    <joint name="back_left_wheel_joint" type="continuous">
+        <origin xyz="0.0095 0.007 0.0" rpy="0 0 0" />
+        <parent link="left_motor" />
+        <child link="back_left_wheel" />
+        <axis xyz="1.0 0.0 0.0" />
+    </joint>
+
+    <!-- <joint name="Rigid 306" type="fixed">
+        <origin xyz="0.0 -0.02 -0.002" rpy="0 0 0" />
+        <parent link="servo_horn" />
+        <child link="steering_rod" />
+      </joint> -->
+
+    <!-- <joint name="Revolute 307" type="revolute">
+        <origin xyz="0.0 0.0 0.0165" rpy="0 0 0" />
+        <parent link="steering_rod" />
+        <child link="steering_bar" />
+        <axis xyz="0.0 0.0 1.0" />
+        <limit upper="0.488692" lower="-0.488692" effort="100" velocity="100" />
+        <mimic joint="servo_angle" />
+      </joint> -->
+</robot>

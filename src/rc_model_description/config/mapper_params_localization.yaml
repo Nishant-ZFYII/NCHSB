@@ -1,0 +1,87 @@
+
+slam_toolbox:
+  ros__parameters:
+
+    # Use Gazebo clock
+    use_sim_time: true
+
+    # Starting point - matches spawn position for corridor world
+    map_start_pose: [-3.5, -0.5, -1.5078]
+    map_start_at_dock: false
+
+    # Plugin params
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: None
+
+    # Frames / topics
+    odom_frame: odom
+    map_frame: map
+    base_frame: base_link
+    scan_topic: /scan
+    mode: localization
+    map_file_name: /home/asas/Documents/NCHSB/src/rc_model_description/maps/narrow_corridor_slam
+    use_map_saver: false
+     
+
+    # Timing & TF
+    transform_publish_period: 0.02   # s, publishes map->odom
+    map_update_interval: 2.0         # s
+    minimum_time_interval: 0.0
+    transform_timeout: 0.8           # Increased for sim time sync
+    tf_buffer_duration: 30.0         # Increased buffer
+
+    # Map properties
+    resolution: 0.05                 # m/cell
+    max_laser_range: 8.0             # Match lidar capability
+    min_laser_range: 0.15
+    
+    # Internal buffers
+    stack_size_to_use: 40000000
+    scan_buffer_size: 50
+    scan_buffer_maximum_scan_distance: 8.0
+    throttle_scans: 1   
+
+    # Scan matching - TUNED FOR DYNAMIC OBSTACLES
+    # Lower response thresholds = accept partial matches (obstacles not in map)
+    use_scan_matching: true
+    use_scan_barycenter: false
+    minimum_travel_distance: 0.5       # Don't re-localize too often
+    minimum_travel_heading: 0.5        # Don't re-localize on small turns
+    
+    # Loop closing ON but conservative - only closes when very confident
+    do_loop_closing: true
+    loop_search_maximum_distance: 3.0
+    enable_interactive_mode: true
+    do_relocalization: false
+    loop_search_radius: 3.0
+    loop_match_minimum_chain_size: 10
+    loop_match_maximum_variance_coarse: 5.0    # More tolerant
+    loop_match_maximum_variance_fine: 1.0      # More tolerant
+    loop_match_minimum_response_coarse: 0.2    # Accept worse matches
+    loop_match_minimum_response_fine: 0.3      # Accept worse matches
+    link_match_minimum_response_fine: 0.05     # Accept worse matches
+    link_scan_maximum_distance: 3.0
+
+    # Larger search space to handle mismatches
+    correlation_search_space_dimension: 0.3    # Smaller = less chance to jump
+    correlation_search_space_resolution: 0.01
+    correlation_search_space_smear_deviation: 0.05
+
+    loop_search_space_dimension: 4.0
+    loop_search_space_resolution: 0.05
+    loop_search_space_smear_deviation: 0.03
+
+    # Higher penalties = more tolerant of mismatches from dynamic obstacles
+    distance_variance_penalty: 0.8
+    angle_variance_penalty: 0.8
+
+    fine_search_angle_offset: 0.00349
+    coarse_search_angle_offset: 0.5            # Smaller search angle
+    coarse_angle_resolution: 0.0349
+    minimum_angle_penalty: 0.7                 # More tolerant
+    minimum_distance_penalty: 0.4              # More tolerant
+    use_response_expansion: true

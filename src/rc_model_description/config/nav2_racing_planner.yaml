@@ -1,0 +1,177 @@
+####################################################################
+# NAV2 CONFIGURATION WITH RACING LINE PLANNER
+# Use this instead of nav2_params_rc.yaml for racing line navigation
+####################################################################
+
+# Import most settings from the main config, but override planner_server
+# This file focuses on the racing line planner configuration
+
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 10.0
+    use_sim_time: True
+
+    # Use the racing line planner instead of Hybrid A*
+    planner_plugins: ["RacingLinePlanner"]
+
+    RacingLinePlanner:
+      plugin: "rc_racing_planner::RacingLinePlanner"
+      racing_line_file: "/home/asas/Documents/NCHSB/src/rc_model_description/maps/final_racing_line.yaml"
+      is_closed_loop: true  # Square loop corridor is closed
+
+####################################################################
+# CONTROLLER SERVER - OPTIMIZED FOR RACING LINE FOLLOWING
+####################################################################
+controller_server:
+  ros__parameters:
+    use_sim_time: True
+    controller_frequency: 20.0
+
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.0
+    min_theta_velocity_threshold: 0.001
+
+    failure_tolerance: 0.5
+
+    progress_checker_plugin: "progress_checker"
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.8
+      movement_time_allowance: 15.0
+
+    general_goal_checker:
+      plugin: "nav2_controller::SimpleGoalChecker"
+      stateful: True
+      xy_goal_tolerance: 0.40
+      yaw_goal_tolerance: 0.70
+
+    # MPPI Controller optimized for racing line following
+    FollowPath:
+      plugin: "nav2_mppi_controller::MPPIController"
+
+      # Core rollout settings
+      time_steps: 56
+      model_dt: 0.05
+      batch_size: 2000
+
+      # Gaussian sampling
+      vx_std: 0.5
+      vy_std: 0.0
+      wz_std: 0.6
+
+      # Velocity limits
+      vx_max: 2.0
+      vx_min: -0.2
+      vy_max: 0.0
+      wz_max: 1.5
+
+      # Acceleration limits
+      ax_max: 4.0
+      ax_min: -4.0
+      ay_max: 0.0
+      ay_min: 0.0
+      az_max: 5.0
+
+      iteration_count: 2
+      prune_distance: 3.5
+      transform_tolerance: 0.15
+
+      temperature: 0.25
+      gamma: 0.005
+
+      motion_model: "Ackermann"
+      visualize: true
+      reset_period: 1.0
+      regenerate_noises: false
+
+      TrajectoryVisualizer:
+        trajectory_step: 4
+        time_step: 2
+
+      AckermannConstraints:
+        min_turning_r: 0.55  # Realistic turning radius for RC car
+
+      # CRITICS - OPTIMIZED FOR RACING LINE FOLLOWING
+      critics: [
+        "ConstraintCritic",
+        "ObstaclesCritic",
+        "PathFollowCritic",
+        "PathAlignCritic",
+        "PathAngleCritic",
+        "GoalCritic",
+        "GoalAngleCritic",
+        "PreferForwardCritic",
+        "TwirlingCritic"
+      ]
+
+      ConstraintCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 4.5
+
+      # SAFETY - High weight for obstacles
+      ObstaclesCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 10.0
+        consider_footprint: true
+        collision_margin_distance: 0.15
+        near_goal_distance: 0.5
+        inflation_layer_name: "inflation_layer"
+        critical_weight: 30.0
+
+      # PATH FOLLOWING - HIGH for racing line adherence
+      PathFollowCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 15.0  # HIGH - stick to racing line
+        offset_from_furthest: 8
+        threshold_to_consider: 0.8
+
+      # PATH ALIGNMENT - HIGH for racing line direction
+      PathAlignCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 12.0  # HIGH - align with racing line
+        max_path_occupancy_ratio: 0.25
+        trajectory_point_step: 4
+        threshold_to_consider: 0.5
+        offset_from_furthest: 15
+        use_path_orientations: true  # Follow racing line orientations
+
+      # PATH ANGLE - Smooth execution
+      PathAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 8.0
+        offset_from_furthest: 10
+        threshold_to_consider: 0.8
+        max_angle_to_furthest: 1.5
+        mode: 0
+
+      GoalCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.0
+        threshold_to_consider: 1.4
+
+      GoalAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 2.0
+        threshold_to_consider: 0.5
+
+      PreferForwardCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 20.0
+        threshold_to_consider: 0.2
+
+      TwirlingCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 8.0
+

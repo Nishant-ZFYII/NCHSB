@@ -1,0 +1,73 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <ros2_control name="GazeboSystem" type="system">
+    <!-- Tells us that the robot is not physical but instead a gazebo simulator. -->
+        <hardware>
+            <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+        </hardware>
+        <!--Which joint is being actuated, command_interface defines how we can actuate the joint-->
+        <joint name="front_left_wheel_joint">
+            <!--<command_interface name="velocity">-->
+            <!--Velocity Limits-->
+                <!--<param name="min">-60</param>-->
+                <!--<param name="max">60</param>-->
+            <!--</command_interface>-->
+            <!--What info we can read from the joint, position and velocity-->
+            <state_interface name="velocity"/>
+            <state_interface name="position"/>
+        </joint>
+        <joint name="front_right_wheel_joint">
+            <!--<command_interface name="velocity">-->
+                <!--<param name="min">-60</param>-->
+                <!--<param name="max">60</param>-->
+            <!--</command_interface>-->
+            <state_interface name="velocity"/>
+            <state_interface name="position"/>
+        </joint>
+         <joint name="back_left_wheel_joint">
+            <command_interface name="velocity">
+                <param name="min">-60</param>
+                <param name="max">60</param>
+            </command_interface>
+            <state_interface name="velocity"/>
+            <state_interface name="position"/>
+        </joint>
+        <joint name="back_right_wheel_joint">
+            <command_interface name="velocity">
+                <param name="min">-60</param>
+                <param name="max">60</param>
+            </command_interface>
+            <state_interface name="velocity"/>
+            <state_interface name="position"/>
+        </joint>
+        <joint name="right_wheel_mount_turn">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+        </joint>
+        <joint name="left_wheel_mount_turn">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+        </joint>
+    </ros2_control>
+
+    <gazebo>
+    <plugin filename="gz_ros2_control-system"
+            name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <ros>
+            <!-- Publish TF to /tf so the rest of ROS sees odom->base_link -->
+            <remapping>ackermann_steering_controller/tf_odometry:=tf</remapping>
+
+            <!-- Optional: also expose odometry on /odom if you want the standard name -->
+            <remapping>ackermann_steering_controller/odometry:=odom</remapping>
+        </ros>
+
+        <robot_param>robot_description</robot_param>
+        <robot_param_node>robot_state_publisher</robot_param_node>
+        <parameters>$(find rc_model_description)/config/controllers.yaml</parameters>
+            <!-- no <ros><namespace>…</namespace></ros> -->
+    </plugin>
+    </gazebo>
+
+
+</robot>

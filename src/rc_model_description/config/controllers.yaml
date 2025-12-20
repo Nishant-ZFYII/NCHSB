@@ -1,0 +1,44 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    ackermann_steering_controller:
+      type: ackermann_steering_controller/AckermannSteeringController
+
+ackermann_steering_controller:
+  ros__parameters:
+
+    
+    # Choose stamped vs unstamped command topic:
+    use_stamped_vel: true
+    position_feedback: true
+
+    # Joints (front = steering, rear = traction)
+    front_wheels_names: [left_wheel_mount_turn,right_wheel_mount_turn]
+    rear_wheels_names: [back_left_wheel_joint,back_right_wheel_joint]
+
+    # State interfaces
+    front_wheels_state_names: [left_wheel_mount_turn,right_wheel_mount_turn ]
+    rear_wheels_state_names: [back_left_wheel_joint,back_right_wheel_joint]
+
+    # Geometry
+    wheelbase: 0.1869
+    front_wheel_track: 0.137
+    rear_wheel_track: 0.145
+    front_wheels_radius: 0.055
+    rear_wheels_radius: 0.055
+
+    # Frames + odom
+    base_frame_id: base_link
+    odom_frame_id: odom
+    enable_odom_tf: false
+    publish_odom: true
+
+    # Odometry/control options
+    open_loop: false
+
+    # Controller update rate
+    update_rate: 100

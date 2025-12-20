@@ -1,0 +1,9 @@
+<library path="rc_racing_planner">
+  <class name="rc_racing_planner::RacingLinePlanner" type="rc_racing_planner::RacingLinePlanner" base_class_type="nav2_core::GlobalPlanner">
+    <description>
+      Racing line global planner that follows a precomputed optimal racing line.
+      Designed for narrow corridor navigation with Ackermann steering.
+    </description>
+  </class>
+</library>
+

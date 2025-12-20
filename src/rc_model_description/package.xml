@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>rc_model_description</name>
+  <version>0.0.1</version>
+  <description>ROS 2 description package for the RC model (converted from ROS 1)</description>
+  <maintainer email="nishantpushparaju@gmail.com">you</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- runtime tools we use -->
+  <!--NODE 1: ros2 tf (transform frames is called here to display the bot in rviz)-->
+  <exec_depend>robot_state_publisher</exec_depend>
+
+  <!--NODE 2: ros2 tf publishes joint states-->
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+
+  <!--not a node but convert xacro to urdf-->
+  <exec_depend>xacro</exec_depend>
+  <!-- IMU +EKF ADDED: robot_localization -->
+  <exec_depend>robot_localization</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <export>
+  <build_type>ament_cmake</build_type>
+  </export>
+</package>

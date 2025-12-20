@@ -1,0 +1,6 @@
+linear_angular_ref:
+  ros__parameters:
+    type: forward_command_controller/ForwardCommandController
+    interface_names:
+      - ackermann_steering_controller/linear/velocity
+      - ackermann_steering_controller/angular/velocity

@@ -1,0 +1,113 @@
+# **Project Summary: High-Speed Corridor Navigation & Human-Aware Collision Mitigation**
+
+---
+
+## **Core Problem Statement**
+
+We aim to design and implement an **autonomous high-speed navigation system** for a robot (modified Traxxas RC car) operating in **narrow indoor corridors** with only ~20–30 cm clearance. The bot must:  
+
+1. **Detect and track static and dynamic obstacles** using LiDAR in real time.  
+2. **Prioritize human safety** when conflicts occur, embedding ethical decision-making.  
+3. **Plan and execute time-optimal high-speed maneuvers** in tight corridors, respecting dynamic and friction limits.  
+4. **Trigger emergency control** (E-MPC) when collisions are inevitable, minimizing impact severity.  
+5. Achieve **real-time performance (<80 ms loop)** at speeds up to ~10 m/s.  
+
+The system will integrate **perception, decision-making, planning, and control** inside a **ROS 2 simulation (Gazebo/CARLA)** before any hardware deployment.  
+
+---
+
+## **Motivation and Context**
+
+* Existing **indoor mobile robots** (hospital bots, warehouse AGVs) operate <2 m/s and rely on conservative planners like DWA/TEB.  
+* **Corridor racing at 6–10 m/s** introduces challenges not handled by current navigation stacks (tight clearances, oscillation, dynamic pedestrians).  
+* **MPC-based racing controllers** (e.g., AMZ Driverless) are proven on racetracks but rarely applied to **indoor corridors** with dynamic human interaction.  
+* Our target: bring together **racing-grade MPC/LLA-MPC**, **ethical decision layers**, and **LiDAR-only perception** to enable **fast, safe indoor navigation**.  
+
+---
+
+## **Key Simulation Scenarios**
+
+* **Scenario 1 (Dynamic obstacle avoidance):** Human crosses corridor; bot predicts trajectory and decelerates or sidesteps within corridor bounds.  
+* **Scenario 2 (Narrow-gap racing):** Bot maintains stability at ~8 m/s while respecting 20–30 cm wall margins, avoiding oscillations.  
+* **Scenario 3 (Inevitable collision minimization):** Pop-up obstacle blocks corridor; E-MPC executes controlled braking/steering to reduce impact.  
+
+These require **predictive dynamics, ethical risk prioritization, and ultra-low-latency planning**.  
+
+---
+
+## **System Requirements**
+
+### Perception (LiDAR-Only)  
+* **SLAM & localization:** `slam_toolbox` or Cartographer fused with IMU/odometry.  
+* **Dynamic obstacle detection:** clustering + IMM/EKF tracking of moving obstacles.  
+* **Human-aware labeling:** classify clusters by shape/speed; inflate costs more for humans.  
+
+### Ethical Decision Layer  
+* Cost hierarchy: **Human > Object > Wall**.  
+* Corridor costmap augmented with **dynamic risk buffers**.  
+* Ethical fallback: when choices are limited, minimize harm severity.  
+
+### Local Planning (Corridor MPC)  
+* **Corridor extraction:** compute left/right envelopes, fit centerline spline.  
+* **LLA-MPC / MPCC:** optimize progress along centerline subject to corridor bounds, friction, curvature.  
+* **Emergency MPC:** short-horizon braking/steering if time-to-collision <0.8 s.  
+
+### Residual RL Augmentation  
+* Use **Drive Fast, Learn Faster** or **RLPP** methods as residuals over MPC to handle slip or understeer at high speed.  
+
+### Control Layer  
+* Bicycle model with slip angle.  
+* 200 Hz ECU loop for torque/brake/steer.  
+* Anti-oscillation filters to suppress wall “ping-ponging.”  
+
+---
+
+## **Simulation & Testing Plan (3-Month Focus)**
+
+1. **Baseline corridor sim:** Create narrow corridor worlds in Gazebo/CARLA; validate SLAM + costmap.  
+2. **Corridor extraction + speed planner:** Run pure pursuit baseline at 1–2 m/s.  
+3. **E-MPC + time-optimal MPC:** Integrate OSQP-based MPC node at 50 Hz; tune for 6–8 m/s runs.  
+4. **Dynamic human obstacles:** Insert moving pedestrian models; test ethical prioritization and E-MPC fallbacks.  
+5. **Performance metrics:** latency, tracking error, TTC safety margin, collision severity reduction.  
+
+---
+
+## **Recent Research Integration (2024–2025)**
+
+1. **AMZ Driverless MPCC (2019)** – baseline racing MPC framework.  
+2. **LLA-MPC (2025)** – real-time adaptive friction-aware MPC.  
+3. **Drive Fast, Learn Faster (2025)** – residual SAC for rapid adaptation.  
+4. **RLPP (2025)** – sim-to-real transfer with residual RL.  
+5. **Ethical Planning (Geisslinger 2023)** – EU-aligned ethical cost functions.  
+6. **A-LAPPM (2025)** – attention-based accident prediction.  
+7. **Safe RL (He 2024)** – formal safety-constrained RL.  
+
+---
+
+## **Technical Stack**
+
+* **Languages:** Python (ML, prototyping), C++ (MPC/control).  
+* **Frameworks:** ROS 2 Humble, Gazebo/Carla, RViz, OSQP/CasADi.  
+* **Compute:** NVIDIA Jetson/desktop GPU for sim.  
+* **Datasets:** Synthetic Gazebo/CARLA scenarios.  
+
+---
+
+## **Deliverables (Simulation Phase)**
+
+1. **Perception & risk module** (LiDAR clustering + human-aware costmap).  
+2. **Corridor-aware MPC planner** (LLA-MPC with emergency fallback).  
+3. **ROS 2 integrated sim demo** showing:  
+   * Fast, stable corridor navigation at >6 m/s.  
+   * Safe avoidance of dynamic humans.  
+   * Ethical decision-making when collisions are unavoidable.  
+
+---
+
+## **Final Vision**
+
+By combining **LiDAR-only perception**, **corridor-aware MPC**, **ethical cost functions**, and **residual RL**, this project pioneers a **new class of high-speed indoor robots** that:  
+* Navigate corridors safely at unprecedented speeds.  
+* Prioritize human life over property or self-preservation.  
+* Demonstrate **novel predictive control in confined environments**.  
+* Provide a foundation for future real-world deployment on the modified Traxxas platform.  

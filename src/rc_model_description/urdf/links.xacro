@@ -1,0 +1,436 @@
+<?xml version="1.0"?>
+<robot name="rc_model" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <link name="base_link">
+    </link>
+
+    <joint name="base_link_to_chassis" type="fixed">
+        <parent link="base_link"/>
+        <child link="chassis_link"/>
+        <origin xyz="0.18938 0 0" rpy="0 0 1.5707"/> 
+    </joint>
+
+    <link name="chassis_link">
+        <visual>
+            <origin xyz="0 0 0.0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/base_link.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="silver" />
+        </visual>
+        <collision>
+            <origin xyz="0 0 0.0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/base_link.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+        </collision>
+    </link>
+
+    <link name="servo_horn">
+        <inertial>
+            <origin xyz="-1.460882973575682e-05 -0.007871889996444085 0.0006174758834835425"
+                rpy="0 0 0" />
+            <mass value="0.00950784131380662" />
+            <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="-0.0" iyz="-0.0" ixz="0.0" />
+        </inertial>
+        <visual>
+            <origin xyz="-0.01 -0.0145 0.023" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/servo_horn.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="silver" />
+        </visual>
+        <collision>
+            <origin xyz="-0.01 -0.0145 0.023" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/servo_horn.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+        </collision>
+    </link>
+
+    <link name="left_wheel_mount">
+        <inertial>
+            <origin xyz="0.0001100665752926111 -0.0003109939838788164 -0.00016990269857806864"
+                rpy="0 0 0" />
+            <mass value="0.05436953130754834" />
+            <inertia ixx="7e-06" iyy="3e-06" izz="5e-06" ixy="-0.0" iyz="-0.0" ixz="-0.0" />
+        </inertial>
+        <visual>
+            <origin xyz="-0.064 -0.0025 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/left_wheel_mount.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="silver" />
+        </visual>
+        <collision>
+            <origin xyz="-0.064 -0.0025 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/left_wheel_mount.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+        </collision>
+    </link>
+
+    <link name="right_wheel_mount">
+        <inertial>
+            <origin xyz="-0.00011006657149828514 -0.00031099398387884024 -0.00016990269874315057"
+                rpy="0 0 0" />
+            <mass value="0.05436953130754809" />
+            <inertia ixx="7e-06" iyy="3e-06" izz="5e-06" ixy="0.0" iyz="-0.0" ixz="0.0" />
+        </inertial>
+        <visual>
+            <origin xyz="0.064 -0.0025 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/right_wheel_mount.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="silver" />
+        </visual>
+        <collision>
+            <origin xyz="0.064 -0.0025 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/right_wheel_mount.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+        </collision>
+    </link>
+
+    <link name="front_assembly">
+        <inertial>
+            <origin xyz="2.0263603307538467e-06 -0.013870173245129229 -0.010153618514841685"
+                rpy="0 0 0" />
+            <mass value="0.5186122317437215" />
+            <inertia ixx="0.000468" iyy="0.000561" izz="0.000768" ixy="0.0" iyz="-0.000131"
+                ixz="0.0" />
+        </inertial>
+        <visual>
+            <origin xyz="0.0 -0.0305 -0.02275" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/front_assembly.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="silver" />
+        </visual>
+        <collision>
+            <origin xyz="0.0 -0.0305 -0.02275" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/front_assembly.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+        </collision>
+    </link>
+
+    <link name="suspension_axle">
+        <inertial>
+            <origin xyz="-3.669079600359632e-17 -0.03206500000000001 3.469446951953614e-18"
+                rpy="0 0 0" />
+            <mass value="0.08896174562624065" />
+            <inertia ixx="3.2e-05" iyy="3e-06" izz="3.2e-05" ixy="-0.0" iyz="0.0" ixz="-0.0" />
+        </inertial>
+        <visual>
+            <origin xyz="-0.0 -0.09463 -0.02275" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/suspension_axle.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="silver" />
+        </visual>
+        <collision>
+            <origin xyz="-0.0 -0.09463 -0.02275" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/suspension_axle.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+        </collision>
+    </link>
+
+    <link name="imu_link">
+        <!-- potentially need stuff here -->
+    </link>
+
+    <link name="lidar_link">
+        <!-- <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+        <box size="0.1 0.1 0.1"/>
+        </geometry> -->
+
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <box size="0.01 0.01 0.01" />
+            </geometry>
+            <material name="black" />
+        </visual>
+    </link>
+
+    <!-- Gazebo Fortress / Harmonic 2D LiDAR attached to lidar_link -->
+    <gazebo reference="lidar_link">
+      <sensor name="lidar" type="gpu_lidar">
+        <!-- Pose is relative to lidar_link; keep it at the link origin for now -->
+        <pose>0 0 0 0 0 0</pose>
+
+        <!-- Topic name inside Gazebo (will bridge this to ROS later) -->
+        <topic>scan</topic>
+
+        <!-- 20–30 Hz update rate -->
+        <update_rate>25</update_rate>
+
+        <lidar>
+          <scan>
+            <horizontal>
+              <!-- 360° FOV, 720 rays => 0.5° resolution -->
+              <samples>720</samples>
+              <resolution>1</resolution>
+              <min_angle>-3.14159</min_angle>
+              <max_angle> 3.14159</max_angle>
+            </horizontal>
+            <vertical>
+              <!-- 2D planar scan -->
+              <samples>1</samples>
+              <resolution>1</resolution>
+              <min_angle>0</min_angle>
+              <max_angle>0</max_angle>
+            </vertical>
+          </scan>
+
+          <!-- Indoor corridor-ish ranges -->
+          <range>
+            <min>0.12</min>   <!-- ignore super-close noise -->
+            <max>8.0</max>    <!-- plenty for narrow corridors -->
+            <resolution>0.01</resolution>
+          </range>
+
+          <!-- A bit of Gaussian noise to keep it realistic -->
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.01</stddev>
+          </noise>
+        </lidar>
+
+        <always_on>true</always_on>
+        <visualize>true</visualize>
+        <gz_frame_id>lidar_link</gz_frame_id>
+      </sensor>
+    </gazebo>
+
+
+    <link name="servo">
+        <inertial>
+            <origin xyz="-0.024893878005047748 0.0045000006838291935 0.010046478190773773"
+                rpy="0 0 0" />
+            <mass value="0.24909707230016578" />
+            <inertia ixx="4e-05" iyy="6.7e-05" izz="4.3e-05" ixy="0.0" iyz="0.0" ixz="1e-06" />
+        </inertial>
+        <visual>
+            <origin xyz="-0.025 -0.01 0.005" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/servo.stl" scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="silver" />
+        </visual>
+        <collision>
+            <origin xyz="-0.025 -0.01 0.005" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/servo.stl" scale="0.001 0.001 0.001" />
+            </geometry>
+        </collision>
+    </link>
+
+    <link name="left_motor">
+        <inertial>
+            <origin xyz="-0.0245862223060676 0.00032401346399821285 -5.755815434930599e-06"
+                rpy="0 0 0" />
+            <mass value="0.1278108358826081" />
+            <inertia ixx="2.3e-05" iyy="5.9e-05" izz="5.9e-05" ixy="-1e-06" iyz="-0.0" ixz="-0.0" />
+        </inertial>
+        <visual>
+            <origin xyz="-0.063 -0.18238 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/left_motor.stl" scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="silver" />
+        </visual>
+        <collision>
+            <origin xyz="-0.063 -0.18238 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/left_motor.stl" scale="0.001 0.001 0.001" />
+            </geometry>
+        </collision>
+    </link>
+
+    <link name="right_motor">
+        <inertial>
+            <origin xyz="0.024586222306067662 0.00032401346399821285 5.7558154691037845e-06"
+                rpy="0 0 0" />
+            <mass value="0.1278108358826081" />
+            <inertia ixx="2.3e-05" iyy="5.9e-05" izz="5.9e-05" ixy="1e-06" iyz="0.0" ixz="-0.0" />
+        </inertial>
+        <visual>
+            <origin xyz="0.063 -0.18238 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/right_motor.stl" scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="silver" />
+        </visual>
+        <collision>
+            <origin xyz="0.063 -0.18238 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/right_motor.stl" scale="0.001 0.001 0.001" />
+            </geometry>
+        </collision>
+    </link>
+
+    <link name="front_right_wheel">
+        <inertial>
+            <origin xyz="-0.015146771015638341 1.0053778219838716e-06 -2.3198153083388295e-08"
+                rpy="0 0 0" />
+            <mass value="0.569142071306609" />
+            <inertia ixx="0.001077" iyy="0.000616" izz="0.000616" ixy="-0.0" iyz="-0.0" ixz="-0.0" />
+        </inertial>
+        <visual>
+            <origin xyz="0.0685 -0.0025 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/front_right_wheel_collision.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="silver" />
+        </visual>
+        <collision>
+            <origin xyz="0.0685 -0.0025 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/front_right_wheel_collision.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <surface>
+                <friction>
+                    <ode>
+                    <mu>2.0</mu>
+                    <mu2>2.0</mu2>
+                    <slip1>0.1</slip1>
+                    <slip2>0.1</slip2>
+                    </ode>
+                </friction>
+                <contact>
+                    <ode/>
+                </contact>
+            </surface>
+        </collision>
+    </link>
+
+    <link name="front_left_wheel">
+        <inertial>
+            <origin xyz="0.015146771015638272 -1.00537782258929e-06 -2.319815317055815e-08"
+                rpy="0 0 0" />
+            <mass value="0.569142071306609" />
+            <inertia ixx="0.001077" iyy="0.000616" izz="0.000616" ixy="-0.0" iyz="0.0" ixz="0.0" />
+        </inertial>
+        <visual>
+            <origin xyz="-0.0685 -0.0025 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/front_left_wheel_collision.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="silver" />
+        </visual>
+        <collision>
+            <origin xyz="-0.0685 -0.0025 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/front_left_wheel_collision.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <surface>
+                <friction>
+                    <ode>
+                    <mu>2.0</mu>
+                    <mu2>2.0</mu2>
+                    <slip1>0.1</slip1>
+                    <slip2>0.1</slip2>
+                    </ode>
+                </friction>
+                <contact>
+                    <ode/>
+                </contact>
+            </surface>
+        </collision>
+    </link>
+
+    <link name="back_right_wheel">
+        <inertial>
+            <origin xyz="-0.015146771015636287 1.00537782199428e-06 -2.3198136071388847e-08"
+                rpy="0 0 0" />
+            <mass value="0.569142071306609" />
+            <inertia ixx="0.001077" iyy="0.000616" izz="0.000616" ixy="-0.0" iyz="-0.0" ixz="-0.0" />
+        </inertial>
+        <visual>
+            <origin xyz="0.0725 -0.18938 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/back_right_wheel_collision.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="silver" />
+        </visual>
+        <collision>
+            <origin xyz="0.0725 -0.18938 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/back_right_wheel_collision.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <surface>
+                <friction>
+                    <ode>
+                    <mu>2.0</mu>
+                    <mu2>2.0</mu2>
+                    <slip1>0.1</slip1>
+                    <slip2>0.1</slip2>
+                    </ode>
+                </friction>
+                <contact>
+                    <ode/>
+                </contact>
+            </surface>
+        </collision>
+    </link>
+
+    <link name="back_left_wheel">
+        <inertial>
+            <origin xyz="0.015146771015636287 -1.0053778232710364e-06 -2.319813606314891e-08"
+                rpy="0 0 0" />
+            <mass value="0.569142071306609" />
+            <inertia ixx="0.001077" iyy="0.000616" izz="0.000616" ixy="-0.0" iyz="0.0" ixz="0.0" />
+        </inertial>
+        <visual>
+            <origin xyz="-0.0725 -0.18938 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/back_left_wheel_collision.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <material name="silver" />
+        </visual>
+        <collision>
+            <origin xyz="-0.0725 -0.18938 0.003" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://rc_model_description/meshes/back_left_wheel_collision.stl"
+                    scale="0.001 0.001 0.001" />
+            </geometry>
+            <surface>
+                <friction>
+                    <ode>
+                    <mu>2.0</mu>
+                    <mu2>2.0</mu2>
+                    <slip1>0.1</slip1>
+                    <slip2>0.1</slip2>
+                    </ode>
+                </friction>
+                <contact>
+                    <ode/>
+                </contact>
+            </surface>
+        </collision>
+    </link>
+</robot>

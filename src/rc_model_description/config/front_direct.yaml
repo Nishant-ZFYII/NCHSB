@@ -1,0 +1,5 @@
+# /home/asas/Documents/NCHSB/src/rc_model_description/config/front_direct.yaml
+front_direct:
+  ros__parameters:
+    joints: [front_left_wheel_joint, front_right_wheel_joint]
+    interface_name: velocity

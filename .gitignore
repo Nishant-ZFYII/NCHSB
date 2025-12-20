@@ -1,0 +1,99 @@
+# ============================================
+# ROS2 / Colcon Build Artifacts
+# ============================================
+build/
+install/
+log/
+.colcon/
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+.eggs/
+dist/
+*.whl
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# ============================================
+# IDE / Editor
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.cproject
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ============================================
+# OS Generated
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.bak
+
+# ============================================
+# SLAM / Map Data (large binary files)
+# ============================================
+*.data
+*.posegraph
+*.db3
+
+# ============================================
+# Temporary / Generated Files
+# ============================================
+*.log
+*.tmp
+*.temp
+/frames_*.gv
+/frames_*.pdf
+
+# ============================================
+# Archives (keep source, not zips)
+# ============================================
+*.zip
+
+# ============================================
+# External Dependencies (should be cloned separately)
+# ============================================
+aws-robomaker-hospital-world/
+
+# ============================================
+# Old Workspaces
+# ============================================
+sim_ws/
+
+# ============================================
+# Personal Notes (not for public)
+# ============================================
+chatgpt.txt
+error_documentation.txt
+runCommands.txt
+RUN_COMMANDS.txt
+
+# ============================================
+# Results / Recordings (too large for git)
+# ============================================
+results/run_*/
+*.bag
+

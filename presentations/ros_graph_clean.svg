@@ -1,0 +1,216 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 L2,4 Z" fill="#546E7A"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="650" fill="#FFFFFF"/>
+
+  <!-- Title -->
+  <text x="600" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#222222">ROS 2 Node Graph</text>
+
+  <!-- ============ COLUMN 1: SIMULATION ============ -->
+  <rect x="30" y="60" width="150" height="280" rx="8" ry="8" fill="#E3F2FD" stroke="#1976D2" stroke-width="2"/>
+  <text x="105" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#1565C0">SIMULATION</text>
+  
+  <ellipse cx="105" cy="140" rx="55" ry="25" fill="#FFFFFF" stroke="#1976D2" stroke-width="1.5"/>
+  <text x="105" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#1565C0">gz_sim</text>
+
+  <ellipse cx="105" cy="220" rx="60" ry="25" fill="#FFFFFF" stroke="#1976D2" stroke-width="1.5"/>
+  <text x="105" y="218" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#1565C0">robot_state</text>
+  <text x="105" y="230" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#1565C0">_publisher</text>
+
+  <ellipse cx="105" cy="300" rx="60" ry="25" fill="#FFFFFF" stroke="#1976D2" stroke-width="1.5"/>
+  <text x="105" y="298" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#1565C0">ackermann</text>
+  <text x="105" y="310" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#1565C0">_controller</text>
+
+  <!-- ============ COLUMN 2: BRIDGES ============ -->
+  <rect x="210" y="60" width="130" height="280" rx="8" ry="8" fill="#FFF3E0" stroke="#FF9800" stroke-width="2"/>
+  <text x="275" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#E65100">BRIDGES</text>
+  
+  <ellipse cx="275" cy="130" rx="50" ry="22" fill="#FFFFFF" stroke="#FF9800" stroke-width="1.5"/>
+  <text x="275" y="135" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#E65100">lidar_bridge</text>
+
+  <ellipse cx="275" cy="185" rx="50" ry="22" fill="#FFFFFF" stroke="#FF9800" stroke-width="1.5"/>
+  <text x="275" y="190" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#E65100">imu_bridge</text>
+
+  <ellipse cx="275" cy="240" rx="50" ry="22" fill="#FFFFFF" stroke="#FF9800" stroke-width="1.5"/>
+  <text x="275" y="245" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#E65100">clock_bridge</text>
+
+  <ellipse cx="275" cy="300" rx="55" ry="22" fill="#FFFFFF" stroke="#FF9800" stroke-width="1.5"/>
+  <text x="275" y="298" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#E65100">twist_to</text>
+  <text x="275" y="308" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#E65100">_stamped</text>
+
+  <!-- ============ COLUMN 3: TOPICS ============ -->
+  <rect x="370" y="60" width="100" height="280" rx="8" ry="8" fill="#ECEFF1" stroke="#78909C" stroke-width="2"/>
+  <text x="420" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#455A64">TOPICS</text>
+  
+  <rect x="385" y="120" width="70" height="22" rx="3" ry="3" fill="#BBDEFB" stroke="#1976D2" stroke-width="1"/>
+  <text x="420" y="135" text-anchor="middle" font-family="monospace" font-size="9" fill="#1565C0">/scan</text>
+
+  <rect x="385" y="155" width="70" height="22" rx="3" ry="3" fill="#BBDEFB" stroke="#1976D2" stroke-width="1"/>
+  <text x="420" y="170" text-anchor="middle" font-family="monospace" font-size="9" fill="#1565C0">/imu</text>
+
+  <rect x="385" y="190" width="70" height="22" rx="3" ry="3" fill="#E1BEE7" stroke="#9C27B0" stroke-width="1"/>
+  <text x="420" y="205" text-anchor="middle" font-family="monospace" font-size="9" fill="#7B1FA2">/odom</text>
+
+  <rect x="380" y="225" width="80" height="22" rx="3" ry="3" fill="#C8E6C9" stroke="#4CAF50" stroke-width="1"/>
+  <text x="420" y="240" text-anchor="middle" font-family="monospace" font-size="8" fill="#2E7D32">/odom/filt</text>
+
+  <rect x="385" y="260" width="70" height="22" rx="3" ry="3" fill="#C8E6C9" stroke="#4CAF50" stroke-width="1"/>
+  <text x="420" y="275" text-anchor="middle" font-family="monospace" font-size="9" fill="#2E7D32">/map</text>
+
+  <rect x="385" y="295" width="70" height="22" rx="3" ry="3" fill="#FFCDD2" stroke="#E91E63" stroke-width="1"/>
+  <text x="420" y="310" text-anchor="middle" font-family="monospace" font-size="9" fill="#C2185B">/cmd_vel</text>
+
+  <!-- ============ COLUMN 4: LOCALIZATION ============ -->
+  <rect x="500" y="60" width="140" height="180" rx="8" ry="8" fill="#E8F5E9" stroke="#4CAF50" stroke-width="2"/>
+  <text x="570" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#2E7D32">LOCALIZATION</text>
+  
+  <ellipse cx="570" cy="135" rx="55" ry="25" fill="#FFFFFF" stroke="#4CAF50" stroke-width="1.5"/>
+  <text x="570" y="133" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#2E7D32">ekf_imu</text>
+  <text x="570" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#2E7D32">_odom</text>
+
+  <ellipse cx="570" cy="200" rx="55" ry="25" fill="#FFFFFF" stroke="#4CAF50" stroke-width="1.5"/>
+  <text x="570" y="198" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#2E7D32">slam</text>
+  <text x="570" y="210" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#2E7D32">_toolbox</text>
+
+  <!-- ============ COLUMN 5: NAVIGATION ============ -->
+  <rect x="670" y="60" width="300" height="280" rx="8" ry="8" fill="#FCE4EC" stroke="#E91E63" stroke-width="2"/>
+  <text x="820" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#C2185B">NAVIGATION (Nav2)</text>
+  
+  <!-- Row 1 -->
+  <ellipse cx="740" cy="125" rx="55" ry="22" fill="#FFFFFF" stroke="#E91E63" stroke-width="1.5"/>
+  <text x="740" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#C2185B">bt_navigator</text>
+
+  <ellipse cx="890" cy="125" rx="60" ry="22" fill="#FFFFFF" stroke="#E91E63" stroke-width="1.5"/>
+  <text x="890" y="123" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">lifecycle</text>
+  <text x="890" y="133" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">_manager</text>
+
+  <!-- Row 2 -->
+  <ellipse cx="740" cy="175" rx="55" ry="22" fill="#FFFFFF" stroke="#E91E63" stroke-width="1.5"/>
+  <text x="740" y="173" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">planner</text>
+  <text x="740" y="183" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">_server</text>
+
+  <ellipse cx="890" cy="175" rx="60" ry="22" fill="#FFFFFF" stroke="#E91E63" stroke-width="1.5"/>
+  <text x="890" y="173" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">global</text>
+  <text x="890" y="183" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">_costmap</text>
+
+  <!-- Row 3 -->
+  <ellipse cx="740" cy="225" rx="55" ry="22" fill="#FFFFFF" stroke="#E91E63" stroke-width="1.5"/>
+  <text x="740" y="223" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">controller</text>
+  <text x="740" y="233" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">_server</text>
+
+  <ellipse cx="890" cy="225" rx="60" ry="22" fill="#FFFFFF" stroke="#E91E63" stroke-width="1.5"/>
+  <text x="890" y="223" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">local</text>
+  <text x="890" y="233" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">_costmap</text>
+
+  <!-- Row 4 -->
+  <ellipse cx="740" cy="275" rx="55" ry="22" fill="#FFFFFF" stroke="#E91E63" stroke-width="1.5"/>
+  <text x="740" y="273" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">smoother</text>
+  <text x="740" y="283" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">_server</text>
+
+  <ellipse cx="890" cy="275" rx="60" ry="22" fill="#FFFFFF" stroke="#E91E63" stroke-width="1.5"/>
+  <text x="890" y="273" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">velocity</text>
+  <text x="890" y="283" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">_smoother</text>
+
+  <!-- Row 5 -->
+  <ellipse cx="815" cy="320" rx="55" ry="22" fill="#FFFFFF" stroke="#E91E63" stroke-width="1.5"/>
+  <text x="815" y="318" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">behavior</text>
+  <text x="815" y="328" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#C2185B">_server</text>
+
+  <!-- ============ COLUMN 6: OUTPUT ============ -->
+  <rect x="1000" y="60" width="170" height="280" rx="8" ry="8" fill="#E0F7FA" stroke="#00BCD4" stroke-width="2"/>
+  <text x="1085" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#00838F">VISUALIZATION</text>
+  
+  <ellipse cx="1085" cy="150" rx="55" ry="30" fill="#FFFFFF" stroke="#00BCD4" stroke-width="1.5"/>
+  <text x="1085" y="155" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#00838F">rviz2</text>
+
+  <rect x="1020" y="210" width="130" height="60" rx="5" ry="5" fill="#B2EBF2" stroke="#4DD0E1" stroke-width="1"/>
+  <text x="1085" y="235" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#006064">Subscribes to:</text>
+  <text x="1085" y="250" text-anchor="middle" font-family="monospace" font-size="8" fill="#00838F">/tf /map /scan</text>
+  <text x="1085" y="263" text-anchor="middle" font-family="monospace" font-size="8" fill="#00838F">/plan /costmaps</text>
+
+  <!-- ============ ARROWS: LEFT TO RIGHT FLOW ============ -->
+  
+  <!-- Simulation to Bridges -->
+  <line x1="160" y1="140" x2="220" y2="130" stroke="#546E7A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="160" y1="140" x2="220" y2="185" stroke="#546E7A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="160" y1="140" x2="220" y2="240" stroke="#546E7A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Bridges to Topics -->
+  <line x1="325" y1="130" x2="380" y2="131" stroke="#FF9800" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="325" y1="185" x2="380" y2="166" stroke="#FF9800" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Controller to /odom -->
+  <line x1="165" y1="300" x2="380" y2="201" stroke="#9C27B0" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Topics to Localization -->
+  <line x1="455" y1="131" x2="515" y2="200" stroke="#1976D2" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="455" y1="166" x2="515" y2="135" stroke="#1976D2" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="460" y1="201" x2="515" y2="150" stroke="#9C27B0" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Localization outputs -->
+  <line x1="570" y1="160" x2="420" y2="225" stroke="#4CAF50" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="570" y1="225" x2="420" y2="260" stroke="#4CAF50" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Topics to Navigation -->
+  <line x1="460" y1="236" x2="685" y2="225" stroke="#4CAF50" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="455" y1="271" x2="830" y2="175" stroke="#4CAF50" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="455" y1="271" x2="830" y2="225" stroke="#4CAF50" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="455" y1="131" x2="830" y2="225" stroke="#1976D2" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Navigation to /cmd_vel -->
+  <line x1="685" y1="225" x2="455" y2="306" stroke="#E91E63" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- /cmd_vel to stamper -->
+  <line x1="385" y1="306" x2="330" y2="300" stroke="#E91E63" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Stamper to controller -->
+  <line x1="220" y1="300" x2="165" y2="300" stroke="#FF9800" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Nav2 to rviz -->
+  <line x1="950" y1="150" x2="1030" y2="150" stroke="#00BCD4" stroke-width="1.5" stroke-dasharray="4,2"/>
+
+  <!-- ============ DATA FLOW SUMMARY ============ -->
+  <rect x="30" y="360" width="1140" height="80" rx="6" ry="6" fill="#FAFAFA" stroke="#E0E0E0" stroke-width="1"/>
+  <text x="60" y="385" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#424242">Data Flow Summary</text>
+  
+  <text x="60" y="410" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#1565C0">Sensor Path:</text>
+  <text x="150" y="410" font-family="Arial, sans-serif" font-size="10" fill="#444444">Gazebo -> Bridges -> /scan, /imu -> EKF/SLAM -> /odom/filtered, /map -> Nav2 Costmaps</text>
+  
+  <text x="60" y="430" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#C2185B">Command Path:</text>
+  <text x="165" y="430" font-family="Arial, sans-serif" font-size="10" fill="#444444">Nav2 Controller -> /cmd_vel -> TwistStamper -> Ackermann Controller -> Gazebo</text>
+
+  <!-- ============ LEGEND ============ -->
+  <rect x="30" y="460" width="1140" height="70" rx="6" ry="6" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1"/>
+  <text x="60" y="485" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#424242">Legend</text>
+  
+  <ellipse cx="130" cy="510" rx="30" ry="12" fill="#E3F2FD" stroke="#1976D2" stroke-width="1.5"/>
+  <text x="175" y="514" font-family="Arial, sans-serif" font-size="9" fill="#444444">Simulation</text>
+
+  <ellipse cx="270" cy="510" rx="30" ry="12" fill="#FFF3E0" stroke="#FF9800" stroke-width="1.5"/>
+  <text x="315" y="514" font-family="Arial, sans-serif" font-size="9" fill="#444444">Bridges</text>
+
+  <ellipse cx="400" cy="510" rx="30" ry="12" fill="#E8F5E9" stroke="#4CAF50" stroke-width="1.5"/>
+  <text x="445" y="514" font-family="Arial, sans-serif" font-size="9" fill="#444444">Localization</text>
+
+  <ellipse cx="545" cy="510" rx="30" ry="12" fill="#FCE4EC" stroke="#E91E63" stroke-width="1.5"/>
+  <text x="590" y="514" font-family="Arial, sans-serif" font-size="9" fill="#444444">Navigation</text>
+
+  <rect x="680" y="500" width="40" height="16" rx="2" ry="2" fill="#BBDEFB" stroke="#1976D2" stroke-width="1"/>
+  <text x="735" y="512" font-family="Arial, sans-serif" font-size="9" fill="#444444">Sensor</text>
+
+  <rect x="790" y="500" width="40" height="16" rx="2" ry="2" fill="#C8E6C9" stroke="#4CAF50" stroke-width="1"/>
+  <text x="845" y="512" font-family="Arial, sans-serif" font-size="9" fill="#444444">Loc</text>
+
+  <rect x="890" y="500" width="40" height="16" rx="2" ry="2" fill="#FFCDD2" stroke="#E91E63" stroke-width="1"/>
+  <text x="945" y="512" font-family="Arial, sans-serif" font-size="9" fill="#444444">Nav</text>
+
+  <line x1="1000" y1="510" x2="1040" y2="510" stroke="#546E7A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="1055" y="514" font-family="Arial, sans-serif" font-size="9" fill="#444444">Publish</text>
+
+</svg>
+

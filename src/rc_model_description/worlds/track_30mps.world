@@ -1,0 +1,909 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="default">
+    <gravity>0 0 -9.8</gravity>
+    
+    <physics type="ode">
+      <real_time_update_rate>1000.0</real_time_update_rate>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+    </physics>
+
+    <scene>
+      <ambient>0.7 0.65 0.6 1</ambient>
+      <background>0.4 0.6 0.9 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <!-- Mediterranean Sun -->
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <direction>-0.4 0.3 -0.9</direction>
+      <diffuse>1.0 0.95 0.85 1</diffuse>
+      <specular>0.3 0.28 0.25 1</specular>
+    </light>
+
+    <!-- Ground plane -->
+    <model name="ground_plane">
+      <static>true</static>
+      <pose>0 0 0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>300 300</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>300 300</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.25 0.22 0.20 1</ambient>
+            <diffuse>0.35 0.32 0.28 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 
+    ╔══════════════════════════════════════════════════════════════════════════════╗
+    ║        NARROW CORRIDOR HIGH-SPEED TRACK - 30 m/s RACING                     ║
+    ╠══════════════════════════════════════════════════════════════════════════════╣
+    ║  TIGHT CORRIDORS (4-5m width) - TRUE NARROW RACING                          ║
+    ║                                                                              ║
+    ║  SOUTH: 5m wide  - Main straight (Triumphal Arches)                         ║
+    ║  NORTH: 4m wide  - Technical section (Greek Colonnade)                      ║
+    ║  WEST:  5m wide  - Acceleration zone (Egyptian Obelisks)                    ║
+    ║  EAST:  4m wide  - Braking zone (Byzantine Arcade)                          ║
+    ║                                                                              ║
+    ║  Outer Rectangle: 150m × 100m                                               ║
+    ║  Inner Rectangle: 140m × 91m (asymmetric offset)                            ║
+    ║                                                                              ║
+    ║  At 30 m/s with 4-5m corridor = TRUE NARROW CORRIDOR RACING                 ║
+    ║  All features FLUSH to walls - clear racing line                            ║
+    ╚══════════════════════════════════════════════════════════════════════════════╝
+    -->
+
+    <!-- ════════════════ OUTER WALLS ════════════════ -->
+    
+    <!-- Outer South Wall - Terracotta Red -->
+    <model name="outer_south">
+      <static>true</static>
+      <pose>0 -50 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>152 0.4 2.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>152 0.4 2.0</size></box></geometry>
+          <material>
+            <ambient>0.6 0.28 0.18 1</ambient>
+            <diffuse>0.75 0.38 0.25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Outer North Wall - Grey Granite -->
+    <model name="outer_north">
+      <static>true</static>
+      <pose>0 50 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>152 0.4 2.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>152 0.4 2.0</size></box></geometry>
+          <material>
+            <ambient>0.42 0.40 0.38 1</ambient>
+            <diffuse>0.55 0.52 0.50 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Outer West Wall - Golden Sandstone -->
+    <model name="outer_west">
+      <static>true</static>
+      <pose>-75 0 1.0 0 0 1.5708</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>100.4 0.4 2.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>100.4 0.4 2.0</size></box></geometry>
+          <material>
+            <ambient>0.62 0.52 0.32 1</ambient>
+            <diffuse>0.78 0.68 0.45 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Outer East Wall - White Marble -->
+    <model name="outer_east">
+      <static>true</static>
+      <pose>75 0 1.0 0 0 1.5708</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>100.4 0.4 2.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>100.4 0.4 2.0</size></box></geometry>
+          <material>
+            <ambient>0.82 0.80 0.78 1</ambient>
+            <diffuse>0.95 0.93 0.90 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ════════════════ INNER WALLS (NARROW CORRIDORS) ════════════════ -->
+    <!-- Positioned to create 4-5m corridors with asymmetric offset -->
+    
+    <!-- Inner South Wall at y=-45 → 5m south corridor -->
+    <model name="inner_south">
+      <static>true</static>
+      <pose>0.5 -45 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>140 0.4 2.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>140 0.4 2.0</size></box></geometry>
+          <material>
+            <ambient>0.55 0.25 0.15 1</ambient>
+            <diffuse>0.70 0.35 0.22 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Inner North Wall at y=46 → 4m north corridor -->
+    <model name="inner_north">
+      <static>true</static>
+      <pose>0.5 46 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>140 0.4 2.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>140 0.4 2.0</size></box></geometry>
+          <material>
+            <ambient>0.40 0.38 0.36 1</ambient>
+            <diffuse>0.52 0.50 0.48 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Inner West Wall at x=-70 → 5m west corridor -->
+    <model name="inner_west">
+      <static>true</static>
+      <pose>-70 0.5 1.0 0 0 1.5708</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>91.4 0.4 2.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>91.4 0.4 2.0</size></box></geometry>
+          <material>
+            <ambient>0.58 0.48 0.30 1</ambient>
+            <diffuse>0.72 0.62 0.42 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Inner East Wall at x=71 → 4m east corridor -->
+    <model name="inner_east">
+      <static>true</static>
+      <pose>71 0.5 1.0 0 0 1.5708</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>91.4 0.4 2.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>91.4 0.4 2.0</size></box></geometry>
+          <material>
+            <ambient>0.78 0.76 0.74 1</ambient>
+            <diffuse>0.90 0.88 0.85 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════ SOUTH CORRIDOR: TRIUMPHAL ARCH GALLERY ═══════════════════ -->
+    <!-- 5m wide - Square pillars with lintels - FLUSH TO OUTER WALL at y=-49.7         -->
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Arch 1 -->
+    <model name="arch_s1_left">
+      <static>true</static>
+      <pose>-55 -49.7 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.8 0.5 3.0</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.8 0.5 3.0</size></box></geometry>
+          <material><ambient>0.5 0.18 0.12 1</ambient><diffuse>0.65 0.25 0.18 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="arch_s1_right">
+      <static>true</static>
+      <pose>-51 -49.7 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.8 0.5 3.0</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.8 0.5 3.0</size></box></geometry>
+          <material><ambient>0.5 0.18 0.12 1</ambient><diffuse>0.65 0.25 0.18 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="arch_s1_lintel">
+      <static>true</static>
+      <pose>-53 -49.7 3.2 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>5.5 0.6 0.5</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>5.5 0.6 0.5</size></box></geometry>
+          <material><ambient>0.5 0.18 0.12 1</ambient><diffuse>0.65 0.25 0.18 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Victory column -->
+    <model name="victory_s1">
+      <static>true</static>
+      <pose>-35 -49.7 2.0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.9 0.5 4.0</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.9 0.5 4.0</size></box></geometry>
+          <material><ambient>0.52 0.19 0.13 1</ambient><diffuse>0.68 0.26 0.19 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Arch 2 - Triple -->
+    <model name="arch_s2_1">
+      <static>true</static>
+      <pose>-15 -49.7 1.3 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.6 0.4 2.6</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.6 0.4 2.6</size></box></geometry>
+          <material><ambient>0.48 0.17 0.11 1</ambient><diffuse>0.62 0.24 0.17 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="arch_s2_2">
+      <static>true</static>
+      <pose>-10 -49.7 1.3 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.6 0.4 2.6</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.6 0.4 2.6</size></box></geometry>
+          <material><ambient>0.48 0.17 0.11 1</ambient><diffuse>0.62 0.24 0.17 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="arch_s2_3">
+      <static>true</static>
+      <pose>-5 -49.7 1.3 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.6 0.4 2.6</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.6 0.4 2.6</size></box></geometry>
+          <material><ambient>0.48 0.17 0.11 1</ambient><diffuse>0.62 0.24 0.17 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="arch_s2_lintel">
+      <static>true</static>
+      <pose>-10 -49.7 2.8 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>12.0 0.5 0.4</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>12.0 0.5 0.4</size></box></geometry>
+          <material><ambient>0.48 0.17 0.11 1</ambient><diffuse>0.62 0.24 0.17 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Single tall pillar -->
+    <model name="pillar_s1">
+      <static>true</static>
+      <pose>15 -49.7 1.75 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>1.0 0.5 3.5</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>1.0 0.5 3.5</size></box></geometry>
+          <material><ambient>0.55 0.20 0.14 1</ambient><diffuse>0.70 0.28 0.20 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Arch 3 -->
+    <model name="arch_s3_left">
+      <static>true</static>
+      <pose>35 -49.7 1.4 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.7 0.5 2.8</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.7 0.5 2.8</size></box></geometry>
+          <material><ambient>0.50 0.18 0.12 1</ambient><diffuse>0.65 0.25 0.18 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="arch_s3_right">
+      <static>true</static>
+      <pose>40 -49.7 1.4 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.7 0.5 2.8</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.7 0.5 2.8</size></box></geometry>
+          <material><ambient>0.50 0.18 0.12 1</ambient><diffuse>0.65 0.25 0.18 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="arch_s3_lintel">
+      <static>true</static>
+      <pose>37.5 -49.7 3.0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>6.5 0.6 0.4</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>6.5 0.6 0.4</size></box></geometry>
+          <material><ambient>0.50 0.18 0.12 1</ambient><diffuse>0.65 0.25 0.18 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- End monument -->
+    <model name="monument_s">
+      <static>true</static>
+      <pose>58 -49.7 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>1.2 0.5 3.0</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>1.2 0.5 3.0</size></box></geometry>
+          <material><ambient>0.52 0.19 0.13 1</ambient><diffuse>0.68 0.26 0.19 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════ NORTH CORRIDOR: GREEK COLONNADE ══════════════════════════ -->
+    <!-- 4m wide - Round columns varying heights - FLUSH TO OUTER WALL at y=49.7        -->
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Tall column with capital -->
+    <model name="greek_n1">
+      <static>true</static>
+      <pose>-60 49.7 1.75 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.28</radius><length>3.5</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.28</radius><length>3.5</length></cylinder></geometry>
+          <material><ambient>0.50 0.48 0.46 1</ambient><diffuse>0.65 0.62 0.60 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Short squat column -->
+    <model name="greek_n2">
+      <static>true</static>
+      <pose>-48 49.7 0.9 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.35</radius><length>1.8</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.35</radius><length>1.8</length></cylinder></geometry>
+          <material><ambient>0.48 0.46 0.44 1</ambient><diffuse>0.62 0.60 0.58 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Twin columns -->
+    <model name="greek_n3a">
+      <static>true</static>
+      <pose>-32 49.7 1.4 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.22</radius><length>2.8</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.22</radius><length>2.8</length></cylinder></geometry>
+          <material><ambient>0.52 0.50 0.48 1</ambient><diffuse>0.68 0.65 0.62 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="greek_n3b">
+      <static>true</static>
+      <pose>-30 49.7 1.4 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.22</radius><length>2.8</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.22</radius><length>2.8</length></cylinder></geometry>
+          <material><ambient>0.52 0.50 0.48 1</ambient><diffuse>0.68 0.65 0.62 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="greek_n3_ent">
+      <static>true</static>
+      <pose>-31 49.7 2.95 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>3.5 0.5 0.3</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>3.5 0.5 0.3</size></box></geometry>
+          <material><ambient>0.82 0.80 0.78 1</ambient><diffuse>0.92 0.90 0.88 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Very tall slender -->
+    <model name="greek_n4">
+      <static>true</static>
+      <pose>-12 49.7 2.0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.20</radius><length>4.0</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.20</radius><length>4.0</length></cylinder></geometry>
+          <material><ambient>0.55 0.53 0.50 1</ambient><diffuse>0.70 0.68 0.65 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Broken column -->
+    <model name="greek_n5">
+      <static>true</static>
+      <pose>5 49.7 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.32</radius><length>1.2</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.32</radius><length>1.2</length></cylinder></geometry>
+          <material><ambient>0.45 0.43 0.40 1</ambient><diffuse>0.58 0.55 0.52 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Triple with pediment -->
+    <model name="greek_n6a">
+      <static>true</static>
+      <pose>22 49.7 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.25</radius><length>3.0</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.25</radius><length>3.0</length></cylinder></geometry>
+          <material><ambient>0.50 0.48 0.45 1</ambient><diffuse>0.65 0.62 0.60 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="greek_n6b">
+      <static>true</static>
+      <pose>27 49.7 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.25</radius><length>3.0</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.25</radius><length>3.0</length></cylinder></geometry>
+          <material><ambient>0.50 0.48 0.45 1</ambient><diffuse>0.65 0.62 0.60 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="greek_n6c">
+      <static>true</static>
+      <pose>32 49.7 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.25</radius><length>3.0</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.25</radius><length>3.0</length></cylinder></geometry>
+          <material><ambient>0.50 0.48 0.45 1</ambient><diffuse>0.65 0.62 0.60 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="greek_n6_ped">
+      <static>true</static>
+      <pose>27 49.7 3.2 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>12.0 0.6 0.4</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>12.0 0.6 0.4</size></box></geometry>
+          <material><ambient>0.80 0.78 0.75 1</ambient><diffuse>0.92 0.90 0.88 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Thick drum -->
+    <model name="greek_n7">
+      <static>true</static>
+      <pose>48 49.7 1.0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.40</radius><length>2.0</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.40</radius><length>2.0</length></cylinder></geometry>
+          <material><ambient>0.47 0.45 0.42 1</ambient><diffuse>0.60 0.58 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- End pair -->
+    <model name="greek_n8">
+      <static>true</static>
+      <pose>62 49.7 1.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.28</radius><length>3.2</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.28</radius><length>3.2</length></cylinder></geometry>
+          <material><ambient>0.53 0.51 0.48 1</ambient><diffuse>0.68 0.66 0.63 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════ WEST CORRIDOR: EGYPTIAN OBELISKS ═════════════════════════ -->
+    <!-- 5m wide - Tapered monuments - FLUSH TO OUTER WALL at x=-74.7                   -->
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Large obelisk -->
+    <model name="obelisk_w1_base">
+      <static>true</static>
+      <pose>-74.7 -38 0.35 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.5 1.0 0.7</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.5 1.0 0.7</size></box></geometry>
+          <material><ambient>0.55 0.45 0.28 1</ambient><diffuse>0.70 0.60 0.40 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="obelisk_w1_shaft">
+      <static>true</static>
+      <pose>-74.7 -38 2.4 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.4 0.5 3.4</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.4 0.5 3.4</size></box></geometry>
+          <material><ambient>0.60 0.50 0.32 1</ambient><diffuse>0.75 0.65 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Sphinx base -->
+    <model name="sphinx_w">
+      <static>true</static>
+      <pose>-74.7 -25 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.5 2.5 1.0</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.5 2.5 1.0</size></box></geometry>
+          <material><ambient>0.58 0.48 0.30 1</ambient><diffuse>0.72 0.62 0.42 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Small obelisk pair -->
+    <model name="obelisk_w2a">
+      <static>true</static>
+      <pose>-74.7 -10 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.35 0.4 2.5</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.35 0.4 2.5</size></box></geometry>
+          <material><ambient>0.65 0.55 0.38 1</ambient><diffuse>0.80 0.70 0.50 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="obelisk_w2b">
+      <static>true</static>
+      <pose>-74.7 -5 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.35 0.4 2.5</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.35 0.4 2.5</size></box></geometry>
+          <material><ambient>0.65 0.55 0.38 1</ambient><diffuse>0.80 0.70 0.50 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Pylon gateway -->
+    <model name="pylon_w_left">
+      <static>true</static>
+      <pose>-74.7 10 1.5 0 -0.04 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.5 1.2 3.0</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.5 1.2 3.0</size></box></geometry>
+          <material><ambient>0.58 0.48 0.30 1</ambient><diffuse>0.72 0.62 0.42 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="pylon_w_right">
+      <static>true</static>
+      <pose>-74.7 16 1.5 0 -0.04 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.5 1.2 3.0</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.5 1.2 3.0</size></box></geometry>
+          <material><ambient>0.58 0.48 0.30 1</ambient><diffuse>0.72 0.62 0.42 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="pylon_w_lintel">
+      <static>true</static>
+      <pose>-74.7 13 3.2 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.4 8.0 0.4</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.4 8.0 0.4</size></box></geometry>
+          <material><ambient>0.62 0.52 0.34 1</ambient><diffuse>0.76 0.66 0.46 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Tall obelisk -->
+    <model name="obelisk_w3_base">
+      <static>true</static>
+      <pose>-74.7 32 0.4 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.5 1.2 0.8</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.5 1.2 0.8</size></box></geometry>
+          <material><ambient>0.52 0.42 0.26 1</ambient><diffuse>0.68 0.58 0.38 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="obelisk_w3_shaft">
+      <static>true</static>
+      <pose>-74.7 32 2.8 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.4 0.6 4.0</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.4 0.6 4.0</size></box></geometry>
+          <material><ambient>0.60 0.50 0.32 1</ambient><diffuse>0.75 0.65 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════ EAST CORRIDOR: BYZANTINE ARCADE ══════════════════════════ -->
+    <!-- 4m wide - Paired columns with arches - FLUSH TO OUTER WALL at x=74.7           -->
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Paired columns 1 -->
+    <model name="byz_e1a">
+      <static>true</static>
+      <pose>74.7 -38 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.18</radius><length>2.5</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.18</radius><length>2.5</length></cylinder></geometry>
+          <material><ambient>0.85 0.83 0.80 1</ambient><diffuse>0.96 0.94 0.91 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="byz_e1b">
+      <static>true</static>
+      <pose>74.7 -35 1.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.18</radius><length>2.5</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.18</radius><length>2.5</length></cylinder></geometry>
+          <material><ambient>0.85 0.83 0.80 1</ambient><diffuse>0.96 0.94 0.91 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="byz_e1_arch">
+      <static>true</static>
+      <pose>74.7 -36.5 2.7 1.5708 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>1.8</radius><length>0.4</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>1.8</radius><length>0.4</length></cylinder></geometry>
+          <material><ambient>0.75 0.50 0.50 1</ambient><diffuse>0.88 0.62 0.62 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Ornate capital column -->
+    <model name="byz_e2">
+      <static>true</static>
+      <pose>74.7 -22 1.4 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.22</radius><length>2.8</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.22</radius><length>2.8</length></cylinder></geometry>
+          <material><ambient>0.88 0.86 0.82 1</ambient><diffuse>0.98 0.96 0.92 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="byz_e2_cap">
+      <static>true</static>
+      <pose>74.7 -22 2.95 0 0 0.785</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.6 0.6 0.35</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.6 0.6 0.35</size></box></geometry>
+          <material><ambient>0.70 0.55 0.70 1</ambient><diffuse>0.85 0.70 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Triple column group -->
+    <model name="byz_e3a">
+      <static>true</static>
+      <pose>74.7 -8 1.15 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.16</radius><length>2.3</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.16</radius><length>2.3</length></cylinder></geometry>
+          <material><ambient>0.82 0.80 0.78 1</ambient><diffuse>0.94 0.92 0.90 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="byz_e3b">
+      <static>true</static>
+      <pose>74.7 -5 1.15 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.20</radius><length>2.3</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.20</radius><length>2.3</length></cylinder></geometry>
+          <material><ambient>0.82 0.80 0.78 1</ambient><diffuse>0.94 0.92 0.90 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="byz_e3c">
+      <static>true</static>
+      <pose>74.7 -2 1.15 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.16</radius><length>2.3</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.16</radius><length>2.3</length></cylinder></geometry>
+          <material><ambient>0.82 0.80 0.78 1</ambient><diffuse>0.94 0.92 0.90 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="byz_e3_ent">
+      <static>true</static>
+      <pose>74.7 -5 2.45 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.4 8.0 0.35</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.4 8.0 0.35</size></box></geometry>
+          <material><ambient>0.50 0.65 0.75 1</ambient><diffuse>0.65 0.80 0.90 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Green spiral column -->
+    <model name="byz_e4_base">
+      <static>true</static>
+      <pose>74.7 10 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.5 0.6 0.5</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.5 0.6 0.5</size></box></geometry>
+          <material><ambient>0.78 0.76 0.74 1</ambient><diffuse>0.90 0.88 0.86 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="byz_e4">
+      <static>true</static>
+      <pose>74.7 10 1.75 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.20</radius><length>2.5</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.20</radius><length>2.5</length></cylinder></geometry>
+          <material><ambient>0.60 0.75 0.60 1</ambient><diffuse>0.75 0.88 0.75 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Wide paired columns -->
+    <model name="byz_e5a">
+      <static>true</static>
+      <pose>74.7 22 1.35 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.24</radius><length>2.7</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.24</radius><length>2.7</length></cylinder></geometry>
+          <material><ambient>0.86 0.84 0.81 1</ambient><diffuse>0.97 0.95 0.92 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="byz_e5b">
+      <static>true</static>
+      <pose>74.7 28 1.35 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.24</radius><length>2.7</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.24</radius><length>2.7</length></cylinder></geometry>
+          <material><ambient>0.86 0.84 0.81 1</ambient><diffuse>0.97 0.95 0.92 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="byz_e5_arch">
+      <static>true</static>
+      <pose>74.7 25 2.9 1.5708 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>3.5</radius><length>0.4</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>3.5</radius><length>0.4</length></cylinder></geometry>
+          <material><ambient>0.65 0.55 0.75 1</ambient><diffuse>0.80 0.70 0.88 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- End monument -->
+    <model name="byz_e6_base">
+      <static>true</static>
+      <pose>74.7 40 0.35 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.5 1.8 0.7</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.5 1.8 0.7</size></box></geometry>
+          <material><ambient>0.80 0.78 0.75 1</ambient><diffuse>0.92 0.90 0.88 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="byz_e6_col_l">
+      <static>true</static>
+      <pose>74.7 39 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.14</radius><length>1.6</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.14</radius><length>1.6</length></cylinder></geometry>
+          <material><ambient>0.88 0.86 0.83 1</ambient><diffuse>0.98 0.96 0.93 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="byz_e6_col_r">
+      <static>true</static>
+      <pose>74.7 41 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.14</radius><length>1.6</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.14</radius><length>1.6</length></cylinder></geometry>
+          <material><ambient>0.88 0.86 0.83 1</ambient><diffuse>0.98 0.96 0.93 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="byz_e6_top">
+      <static>true</static>
+      <pose>74.7 40 2.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.4 2.8 0.4</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.4 2.8 0.4</size></box></geometry>
+          <material><ambient>0.70 0.60 0.80 1</ambient><diffuse>0.85 0.75 0.92 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <!-- ══════════════════════════ CORNER MONUMENTS ════════════════════════════════════ -->
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+
+    <!-- SW Corner: Roman Arch -->
+    <model name="corner_sw">
+      <static>true</static>
+      <pose>-73 -48 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>1.0 1.0 3.0</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>1.0 1.0 3.0</size></box></geometry>
+          <material><ambient>0.48 0.16 0.10 1</ambient><diffuse>0.62 0.22 0.15 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- NW Corner: Obelisk -->
+    <model name="corner_nw">
+      <static>true</static>
+      <pose>-73 48 2.0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.5 0.5 4.0</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.5 0.5 4.0</size></box></geometry>
+          <material><ambient>0.58 0.48 0.30 1</ambient><diffuse>0.72 0.62 0.42 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- NE Corner: Greek Column -->
+    <model name="corner_ne">
+      <static>true</static>
+      <pose>73 48 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.35</radius><length>3.0</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.35</radius><length>3.0</length></cylinder></geometry>
+          <material><ambient>0.50 0.48 0.45 1</ambient><diffuse>0.65 0.62 0.60 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- SE Corner: Byzantine Dome -->
+    <model name="corner_se_base">
+      <static>true</static>
+      <pose>73 -48 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><cylinder><radius>0.7</radius><length>1.2</length></cylinder></geometry></collision>
+        <visual name="visual"><geometry><cylinder><radius>0.7</radius><length>1.2</length></cylinder></geometry>
+          <material><ambient>0.82 0.80 0.78 1</ambient><diffuse>0.94 0.92 0.90 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="corner_se_dome">
+      <static>true</static>
+      <pose>73 -48 1.6 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><sphere><radius>0.6</radius></sphere></geometry></collision>
+        <visual name="visual"><geometry><sphere><radius>0.6</radius></sphere></geometry>
+          <material><ambient>0.60 0.50 0.70 1</ambient><diffuse>0.75 0.65 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ════════════════ GAZEBO HARMONIC PLUGINS ════════════════ -->
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="libignition-gazebo-imu-system.so"
+            name="ignition::gazebo::systems::Imu"/>
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+  </world>
+</sdf>

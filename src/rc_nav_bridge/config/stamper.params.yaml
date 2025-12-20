@@ -1,0 +1,4 @@
+rc_nav_bridge:
+  ros__parameters:
+    cmd_vel_topic: /cmd_vel
+    reference_topic: /ackermann_steering_controller/reference

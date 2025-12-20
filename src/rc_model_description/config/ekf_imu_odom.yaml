@@ -1,0 +1,74 @@
+# config/ekf_imu_odom.yaml
+# IMU + wheel odom EKF for planar Ackermann car
+
+ekf_imu_odom:
+  ros__parameters:
+    # --- Filter timing ---
+    frequency: 50.0              # Hz, how often to publish /odometry/filtered
+    sensor_timeout: 0.5
+    two_d_mode: true             # Planar robot
+
+    # --- TF publishing ---
+    # We let robot_localization own odom -> base_link
+    publish_tf: true
+    publish_acceleration: false
+
+    # --- Frames ---
+    map_frame: map               # required but not used when world_frame == odom
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom            # EKF works in odom frame
+
+    # ============================================================
+    # 1) ODOM INPUT (from ackermann_steering_controller)
+    # ============================================================
+    # Topic: /odom (nav_msgs/Odometry)
+    odom0: /odom
+
+    # State vector layout:
+    # [ x,  y,  z,
+    #   roll, pitch, yaw,
+    #   vx, vy, vz,
+    #   vroll, vpitch, vyaw,
+    #   ax, ay, az ]
+    #
+    # For a planar robot, we typically fuse:
+    #  - x, y, yaw      (pose)
+    #  - vx, vyaw       (twist)
+    odom0_config: [ true,  true,  false,   # x, y, z
+                    false, false, true,   # roll, pitch, yaw  
+                    false,  false, false,   # vx,  vy,  vz
+                    false, false, false,    # vroll, vpitch, vyaw 
+                    false, false, false ]  # ax, ay, az
+
+    odom0_differential: false
+    odom0_relative: false
+    odom0_queue_size: 10
+
+    # ============================================================
+    # 2) IMU INPUT (from Gazebo IMU)
+    # ============================================================
+    # Topic: /imu (sensor_msgs/Imu)
+    imu0: /imu
+
+    # Use yaw orientation + yaw rate from IMU (planar robot)
+    # [ x,  y,  z,
+    #   roll, pitch, yaw,
+    #   vx, vy, vz,
+    #   vroll, vpitch, vyaw,
+    #   ax, ay, az ]
+    imu0_config: [ false, false, false,  # x, y, z (IMU position – not used)
+                    false,  false,  true,   # roll, pitch, yaw  (IMU gives full orientation)
+                    false, false, false,  # vx, vy, vz
+                    false, false, true,   # vroll, vpitch, vyaw (yaw rate from IMU)
+                    false, false, false ] # ax, ay, az (we can keep them false for now)
+
+    imu0_differential: false
+    imu0_relative: false
+    imu0_queue_size: 50
+    
+    # We’re not using linear acceleration yet, so no gravity removal
+    imu0_remove_gravitational_acceleration: false
+
+    # --- Time / clock --- 
+    use_sim_time: true
