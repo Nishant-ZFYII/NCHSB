@@ -1,0 +1,45 @@
+# EKF for real hardware: AS5600 wheel odometry + Orbbec Femto Bolt IMU
+# Adapted from NCHSB/config/ekf_imu_odom.yaml
+
+ekf_imu_odom:
+  ros__parameters:
+    frequency: 50.0
+    sensor_timeout: 0.5
+    two_d_mode: true
+
+    publish_tf: true
+    publish_acceleration: false
+
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    # Wheel odometry from Teensy bridge
+    odom0: /odom
+
+    odom0_config: [ true,  true,  false,
+                    false, false, true,
+                    false, false, false,
+                    false, false, false,
+                    false, false, false ]
+
+    odom0_differential: false
+    odom0_relative: false
+    odom0_queue_size: 10
+
+    # Orbbec Femto Bolt IMU
+    imu0: /camera/imu
+
+    imu0_config: [ false, false, false,
+                    false, false, true,
+                    false, false, false,
+                    false, false, true,
+                    false, false, false ]
+
+    imu0_differential: false
+    imu0_relative: false
+    imu0_queue_size: 50
+    imu0_remove_gravitational_acceleration: true
+
+    use_sim_time: false
