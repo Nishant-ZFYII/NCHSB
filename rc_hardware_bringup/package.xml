@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rc_hardware_bringup</name>
+  <version>0.1.0</version>
+  <description>
+    Hardware bringup for Traxxas Maxx 4S Ackermann RC car.
+    Replaces Gazebo simulation with real sensor drivers (RPLiDAR A2M8,
+    Orbbec Femto Bolt) and a Teensy 4.1 serial bridge for VESC motor
+    control and AS5600 encoder feedback.
+  </description>
+  <maintainer email="nishant@nyu.edu">Nishant</maintainer>
+  <license>LGPL-3.0-only</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Runtime ROS deps -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>robot_localization</exec_depend>
+  <exec_depend>slam_toolbox</exec_depend>
+  <exec_depend>nav2_bringup</exec_depend>
+
+  <!-- Sensor driver packages (install separately) -->
+  <!-- <exec_depend>rplidar_ros</exec_depend> -->
+  <!-- <exec_depend>orbbec_camera</exec_depend> -->
+
+  <!-- Shared with NCHSB sim stack -->
+  <exec_depend>rc_model_description</exec_depend>
+  <exec_depend>rc_nav_bridge</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

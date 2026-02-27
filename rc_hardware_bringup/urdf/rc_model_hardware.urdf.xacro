@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<!--
+  Hardware URDF for Traxxas Maxx 4S Ackermann RC car.
+  Includes the same kinematic tree as NCHSB but:
+    - No Gazebo plugins (no gz_ros2_control, no GPU lidar sensor)
+    - Adds camera_link for Orbbec Femto Bolt
+    - LiDAR frame matches RPLiDAR A2M8 mounting
+  Joint states come from the Teensy bridge node instead of ros2_control.
+-->
+<robot name="rc_model" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Reuse the mechanical links and joints from NCHSB -->
+  <xacro:include filename="$(find rc_model_description)/urdf/materials.xacro"/>
+  <xacro:include filename="$(find rc_model_description)/urdf/links.xacro"/>
+  <xacro:include filename="$(find rc_model_description)/urdf/joints.xacro"/>
+
+  <!--
+    NOTE: We deliberately do NOT include gazebo_control.xacro.
+    On real hardware, joint_states come from teensy_bridge and
+    sensor data from their respective driver nodes.
+  -->
+
+  <!-- ============================================================
+       Orbbec Femto Bolt camera mount
+       Adjust xyz/rpy to match your physical mounting position
+       relative to chassis_link.
+       ============================================================ -->
+  <link name="camera_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.03 0.09 0.03"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <origin xyz="0.0 0.05 0.08" rpy="0 0 -1.5707"/>
+    <parent link="chassis_link"/>
+    <child link="camera_link"/>
+  </joint>
+
+  <!-- Femto Bolt optical frames (the orbbec_camera driver publishes
+       camera_link → camera_color_optical_frame etc. automatically,
+       but we declare the static link so TF tree is complete even
+       before the driver starts.) -->
+  <link name="camera_depth_optical_frame"/>
+  <joint name="camera_depth_optical_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="-1.5707 0 -1.5707"/>
+    <parent link="camera_link"/>
+    <child link="camera_depth_optical_frame"/>
+  </joint>
+
+  <link name="camera_color_optical_frame"/>
+  <joint name="camera_color_optical_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="-1.5707 0 -1.5707"/>
+    <parent link="camera_link"/>
+    <child link="camera_color_optical_frame"/>
+  </joint>
+
+</robot>
