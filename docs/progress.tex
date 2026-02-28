@@ -1,0 +1,255 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{datetime2}
+
+\geometry{margin=1in}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=cyan
+}
+
+\title{\textbf{NCHSB Project --- Hardware Integration Progress} \\
+\large Branch: \texttt{hardware-integration}}
+\author{Vortex Robotics Team}
+\date{Last updated: \today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+% ============================================================
+\section{Jetson Orin Nano System Configuration}
+% ============================================================
+
+\subsection{Hardware Identification}
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Device Model       & NVIDIA Jetson Orin Nano Developer Kit \\
+Variant            & \textbf{8 GB} (confirmed --- see Section~\ref{sec:ram}) \\
+Architecture       & AArch64 (ARM64) \\
+\bottomrule
+\end{tabular}
+\caption{Jetson Orin Nano hardware identity}
+\end{table}
+
+\subsection{How to Confirm 8\,GB vs 4\,GB}
+\label{sec:ram}
+
+Run the following command to check total system RAM:
+
+\begin{verbatim}
+free -h
+\end{verbatim}
+
+The Jetson Orin Nano uses \textbf{unified memory} (CPU and GPU share the same pool):
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Variant} & \textbf{Raw DRAM} & \textbf{Reported by \texttt{free -h}} \\
+\midrule
+Orin Nano 4\,GB  & 4\,GB             & $\approx$\,3.7\,Gi \\
+Orin Nano 8\,GB  & 8\,GB             & $\approx$\,7.4\,Gi \\
+\bottomrule
+\end{tabular}
+\caption{RAM size vs.\ reported value}
+\end{table}
+
+\noindent
+\textbf{Our system reports 7.4\,Gi $\Rightarrow$ this is the \textcolor{green!50!black}{8\,GB variant}.}
+
+Alternatively, confirm with:
+
+\begin{verbatim}
+cat /proc/device-tree/model
+\end{verbatim}
+
+Which returns:
+\begin{verbatim}
+NVIDIA Jetson Orin Nano Developer Kit
+\end{verbatim}
+
+\subsection{Software Stack}
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Component} & \textbf{Version} \\
+\midrule
+Operating System    & Ubuntu 22.04.5 LTS (Jammy Jellyfish) \\
+L4T Release         & R36.4.7 \\
+JetPack             & 6.2 (maps from L4T R36.4.x) \\
+CUDA                & 12.6 (\texttt{nvcc} V12.6.68) \\
+TensorRT            & \textbf{10.3.0.30} (built against CUDA 12.5) \\
+ONNX (model library) & \textbf{1.20.1} (installed via pip) \\
+ONNX Runtime (CPU)  & \textbf{1.23.2} (installed via pip) \\
+ONNX Runtime (GPU)  & \textit{Not built} --- see Section~\ref{sec:onnx} \\
+Kernel variant      & OOT (Out-of-Tree) \\
+\bottomrule
+\end{tabular}
+\caption{Software stack versions}
+\end{table}
+
+\subsubsection{How to Check TensorRT Version}
+
+\begin{verbatim}
+dpkg -l | grep libnvinfer
+\end{verbatim}
+
+Look for the \texttt{libnvinfer10} line, e.g.:
+\begin{verbatim}
+ii  libnvinfer10   10.3.0.30-1+cuda12.5   arm64
+\end{verbatim}
+
+Or from Python:
+\begin{verbatim}
+python3 -c "import tensorrt; print(tensorrt.__version__)"
+\end{verbatim}
+
+\subsubsection{ONNX / ONNX Runtime Status}
+\label{sec:onnx}
+
+\paragraph{ONNX model library (CPU)} \texttt{onnx} \textbf{1.20.1} --- \textcolor{green!60!black}{installed}.
+
+\paragraph{ONNX Runtime CPU} \texttt{onnxruntime} \textbf{1.23.2} --- \textcolor{green!60!black}{installed}.
+Provides the \texttt{CPUExecutionProvider} only.
+
+\paragraph{ONNX Runtime GPU} \texttt{onnxruntime-gpu} --- \textcolor{red}{NOT installed}.
+
+\noindent
+\textbf{Why no pip install?}  Microsoft does \emph{not} publish pre-built
+\texttt{onnxruntime-gpu} wheels for Linux aarch64 on PyPI (or the NVIDIA/
+Microsoft CUDA-12 index).  The only supported path on Jetson is to
+\textbf{build from source}.
+
+\subsubsection{Building onnxruntime-gpu from Source}
+
+A fully automated build script is provided at:
+\begin{verbatim}
+jetson_deploy/build_onnxruntime_gpu.sh
+\end{verbatim}
+
+\noindent
+Usage (run in a terminal):
+\begin{verbatim}
+# Step 1 – install cuDNN + build tools (needs sudo, run once)
+bash jetson_deploy/build_onnxruntime_gpu.sh deps
+
+# Step 2 – build onnxruntime 1.20.1 with CUDA + TensorRT EPs
+bash jetson_deploy/build_onnxruntime_gpu.sh build
+# WARNING: takes 2–4 hours on the Orin Nano 6-core CPU
+
+# Step 3 – install the resulting wheel
+bash jetson_deploy/build_onnxruntime_gpu.sh install
+
+# Step 4 – verify TensorRT and CUDA providers are available
+bash jetson_deploy/build_onnxruntime_gpu.sh verify
+\end{verbatim}
+
+\noindent
+\textbf{Build configuration used:}
+\begin{itemize}
+  \item \texttt{onnxruntime} tag: \texttt{rel-1.20.1}
+  \item CUDA home: \texttt{/usr/local/cuda} (CUDA 12.6)
+  \item cuDNN home: \texttt{/usr} (libcudnn9 v9.3.0.75)
+  \item TensorRT home: \texttt{/usr} (TRT 10.3.0.30)
+  \item CUDA arch: \texttt{87} (Jetson Orin / Ampere)
+  \item Expected providers after build: \texttt{TensorrtExecutionProvider},
+        \texttt{CUDAExecutionProvider}, \texttt{CPUExecutionProvider}
+\end{itemize}
+
+Check installed packages with:
+\begin{verbatim}
+python3 -m pip show onnx
+python3 -m pip show onnxruntime
+python3 -m pip show onnxruntime-gpu
+\end{verbatim}
+
+% ============================================================
+\section{Project Progress}
+% ============================================================
+
+\subsection{Completed}
+\begin{itemize}[label=\textcolor{green!60!black}{$\checkmark$}]
+    \item Jetson Orin Nano 8\,GB hardware setup
+    \item JetPack 6.2 / L4T R36.4.7 flashed
+    \item CUDA 12.6 installed and verified
+    \item TensorRT 10.3.0.30 installed
+    \item ROS\,2 running (\texttt{ros2 topic list} operational)
+    \item \texttt{onnx} 1.20.1 installed (pip)
+    \item \texttt{onnxruntime} 1.23.2 (CPU) installed (pip)
+    \item Build script created: \texttt{jetson\_deploy/build\_onnxruntime\_gpu.sh}
+\end{itemize}
+
+\subsection{In Progress}
+\begin{itemize}[label=\textcolor{orange}{$\rhd$}]
+    \item Build \texttt{onnxruntime-gpu} 1.20.1 from source (2--4 hrs)
+    \item Hardware integration with RC platform
+\end{itemize}
+
+\subsection{TODO}
+\begin{itemize}[label=$\square$]
+    \item Install cuDNN 9.3 (\texttt{sudo apt install libcudnn9-cuda-12 libcudnn9-dev-cuda-12})
+          then run \texttt{build\_onnxruntime\_gpu.sh}
+    \item Validate TensorRT + CUDA execution providers via \texttt{ort.get\_available\_providers()}
+    \item Benchmark inference latency (TRT EP vs CUDA EP vs CPU)
+    \item Racing line deployment and testing
+    \item Document final deployment steps in \texttt{jetson\_deploy/}
+\end{itemize}
+
+% ============================================================
+\section{Useful Commands Reference}
+% ============================================================
+
+\begin{verbatim}
+# L4T / JetPack version
+cat /etc/nv_tegra_release
+
+# RAM / variant check
+free -h
+
+# CUDA version
+nvcc --version
+
+# TensorRT version
+dpkg -l | grep libnvinfer | head -5
+
+# ONNX version (installed)
+python3 -m pip show onnx onnxruntime
+# GPU version (build from source first)
+python3 -m pip show onnxruntime-gpu
+
+# Check available execution providers (after GPU build)
+python3 -c "import onnxruntime as ort; print(ort.get_available_providers())"
+
+# Build onnxruntime-gpu (run from NCHSB root)
+bash jetson_deploy/build_onnxruntime_gpu.sh deps    # needs sudo
+bash jetson_deploy/build_onnxruntime_gpu.sh build   # ~3 hours
+bash jetson_deploy/build_onnxruntime_gpu.sh install
+
+# ROS2 topics
+ros2 topic list
+
+# Run all nodes
+bash /home/vortex/launch_all.sh
+\end{verbatim}
+
+\end{document}
