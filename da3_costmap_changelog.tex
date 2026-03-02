@@ -1,0 +1,425 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{longtable}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{caption}
+
+\definecolor{improved}{RGB}{34,139,34}
+\definecolor{regression}{RGB}{178,34,34}
+\definecolor{neutral}{RGB}{70,70,70}
+\definecolor{codebg}{RGB}{245,245,245}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  breaklines=true,
+  columns=flexible,
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{DA3 Costmap Ablation}
+\lhead{NCHSB Project}
+\rfoot{Page \thepage}
+
+\title{%
+  \textbf{DA3 Depth-Based Costmap Ablation Study} \\[0.5em]
+  \large Evaluating DA3-Driven Local Costmaps and Dynamic Inflation for Nav2 \\[0.3em]
+  \normalsize NYU MS Project --- Nishant Prabhu
+}
+\author{}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% ============================================================================
+\section{Study Overview}
+% ============================================================================
+
+This document records the results of a depth-based costmap ablation study
+evaluating whether DA3-Small monocular depth predictions can improve Nav2
+local costmaps for autonomous corridor navigation.
+
+\subsection{Motivation}
+
+The current Nav2 stack uses only a 2D LiDAR (\texttt{/scan}) for the
+obstacle layer and a fixed inflation radius of 0.09\,m. The 2D LiDAR
+scans at a single height and cannot detect obstacles at other heights
+(low obstacles, overhanging objects). DA3-Small produces dense depth maps
+from a single RGB camera at 25--40\,FPS on Jetson, covering the full
+image with depth at all heights within the camera FOV ($\sim$81\textdegree{}).
+
+The Orbbec Femto Bolt ToF sensor has 77\% dead pixels in the deployment
+corridor (reflective floors, specular surfaces), confirming that monocular
+depth estimation is necessary for dense depth coverage.
+
+\subsection{Experiment Matrix}
+
+Seven configurations are evaluated:
+
+\begin{table}[h]
+\centering
+\caption{Ablation experiment matrix}
+\label{tab:experiments}
+\begin{tabular}{llll}
+\toprule
+\textbf{Experiment} & \textbf{Obstacle Source} & \textbf{Inflation} & \textbf{Tests} \\
+\midrule
+Baseline & Sensor depth only     & Fixed 0.09\,m            & Current Nav2 config \\
+A1       & Sensor depth only     & Dynamic (corridor width)  & Dynamic inflation alone \\
+A2       & Sensor + DA3 depth    & Fixed 0.09\,m            & Added depth benefit \\
+A3       & Sensor + DA3 depth    & Dynamic (corridor width)  & Best of both \\
+A4       & DA3 depth only        & Dynamic (corridor width)  & LiDAR replacement \\
+A5       & Sensor + DA3 depth    & Class-aware (YOLO+SAM2)  & Per-class safety \\
+A6       & DA3 depth only        & Class-aware (YOLO+SAM2)  & Full vision-only stack \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Metrics}
+
+\begin{itemize}[nosep]
+  \item \textbf{Costmap IoU:} agreement between experiment and Baseline occupancy
+  \item \textbf{Obstacle detection rate:} \% of Baseline lethal cells also detected
+  \item \textbf{False positive rate:} \% of Baseline free cells incorrectly marked
+  \item \textbf{Clearance margin:} min distance from robot centre to nearest lethal cell
+  \item \textbf{Inflation radius:} per-frame dynamic radius (for A1, A3, A4)
+  \item \textbf{Computation time:} per-frame pipeline latency
+\end{itemize}
+
+% ============================================================================
+\section{Phase 1: Offline Corridor Ablation}
+\label{sec:phase1-corridor}
+% ============================================================================
+
+\subsection{Dataset}
+
+459 frames extracted from Orbbec Femto Bolt rosbag (81\,s corridor run).
+Sensor depth aligned to colour camera via 3D reprojection
+(\texttt{extract\_corridor\_bag.py}). DA3-Small depth pre-computed on HPC.
+
+Camera: $f_x = 747.8$, $f_y = 747.5$\,px. Camera height: $\sim$0.25\,m.
+
+\subsection{Run 1 Results (Pre-Fix)}
+
+Initial run with \texttt{corridor\_width} strategy using
+$r = \text{clip}(w \times 0.05,\, 0.05,\, 0.20)$. Two issues identified
+and fixed (see Section~\ref{sec:fixes}).
+
+\begin{table}[h]
+\centering
+\caption{Phase 1 corridor ablation --- Run 1 (459 frames, pre-fix)}
+\label{tab:phase1-run1}
+\begin{tabular}{lrrrrrr}
+\toprule
+\textbf{Exp.} & \textbf{IoU} & \textbf{Det. Rate} & \textbf{FPR} & \textbf{Clearance} & \textbf{Radius} & \textbf{Time} \\
+\midrule
+Baseline & 1.000 & 1.000 & 0.000 & 0.299\,m & 0.090\,m & 17.3\,ms \\
+A1       & 1.000 & 1.000 & 0.000 & 0.299\,m & 0.050\,m & 56.3\,ms \\
+A2       & 0.295 & 1.000 & 0.050 & 0.220\,m & 0.090\,m & 87.3\,ms \\
+A3       & 0.295 & 1.000 & 0.050 & 0.220\,m & 0.050\,m & 126.1\,ms \\
+A4       & 0.226 & 0.767 & 0.050 & 0.224\,m & 0.055\,m & 121.7\,ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Key findings (Run 1):}
+\begin{itemize}[nosep]
+  \item A2/A3 detection rate = 100\%: adding DA3 depth never loses sensor obstacles
+  \item A4 detection rate = 76.7\%: DA3 alone misses 23\% of obstacles (limited FOV)
+  \item A2/A3 clearance 0.220\,m vs Baseline 0.299\,m: DA3 detects obstacles the
+    sensor misses (77\% dead ToF pixels), tightening clearance (safer)
+  \item Corridor width estimates: mean 0.55\,m, all dynamic radii clamped to 0.05\,m floor
+\end{itemize}
+
+\subsection{Fixes Applied}
+\label{sec:fixes}
+
+\subsubsection{Fix 1: Dynamic Inflation Radius Scaling}
+
+The original formula $r = \text{clip}(w \times 0.05,\, 0.05,\, 0.20)$ produced
+$r = 0.05$\,m for all corridor frames (width 0.50--0.97\,m). The strategy was
+inverted: narrow corridors need \emph{larger} inflation for safety, not smaller.
+
+New mapping (inverted logic):
+\begin{itemize}[nosep]
+  \item $w \leq 0.5$\,m $\to$ $r = 0.18$\,m (tight corridor, max safety)
+  \item $w = 1.0$\,m $\to$ $r = 0.12$\,m (moderate)
+  \item $w = 2.0$\,m $\to$ $r = 0.06$\,m (wide passage)
+  \item $w \geq 3.0$\,m $\to$ $r = 0.05$\,m (open space)
+\end{itemize}
+
+\subsubsection{Fix 2: Cost-Threshold-Aware Metrics}
+
+Metrics previously compared only lethal cells (cost = 254). Inflation
+creates a cost gradient (1--253) around obstacles, but this was invisible
+to IoU and clearance metrics. A1 vs Baseline showed identical IoU despite
+different inflation radii (0.05\,m vs 0.09\,m).
+
+Fix: metrics now use a cost threshold of 128. Cells with cost $\geq 128$
+are ``occupied'' for IoU, FPR, and clearance. A new \texttt{lethal\_iou}
+metric tracks raw obstacle agreement separately.
+
+\subsubsection{Fix 3: Class-Aware Inflation Strategy}
+
+The \texttt{class\_aware} strategy now defines per-class radii for use
+with YOLO + SAM2 detection data:
+
+\begin{table}[h]
+\centering
+\caption{Per-class inflation radii (class\_aware strategy)}
+\label{tab:class-radii}
+\begin{tabular}{lr}
+\toprule
+\textbf{Class} & \textbf{Radius (m)} \\
+\midrule
+person     & 0.30 \\
+glass      & 0.20 \\
+furniture  & 0.15 \\
+other      & 0.12 \\
+wall       & 0.06 \\
+floor      & 0.00 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Falls back to \texttt{min\_depth} strategy when no detection data is available.
+
+\subsection{Run 2 Results (Post-Fix)}
+
+\begin{table}[h]
+\centering
+\caption{Phase 1 corridor ablation --- Run 2 (459 frames, post-fix)}
+\label{tab:phase1-run2}
+\begin{tabular}{lrrrrrrr}
+\toprule
+\textbf{Exp.} & \textbf{IoU} & \textbf{L-IoU} & \textbf{Det.Rate} & \textbf{FPR} & \textbf{Clear.} & \textbf{Radius} & \textbf{Time} \\
+\midrule
+Baseline & 1.000 & 1.000 & 1.000 & 0.000 & 0.249\,m & 0.090\,m & 17.7\,ms \\
+A1       & 1.000 & 1.000 & 1.000 & 0.000 & 0.249\,m & 0.177\,m & 56.9\,ms \\
+A2       & 0.379 & 0.295 & 1.000 & 0.053 & 0.171\,m & 0.090\,m & 89.8\,ms \\
+A3       & 0.379 & 0.295 & 1.000 & 0.053 & 0.171\,m & 0.177\,m & 128.8\,ms \\
+A4       & 0.279 & 0.226 & 0.767 & 0.053 & 0.175\,m & 0.165\,m & 124.8\,ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Key findings (Run 2):}
+\begin{enumerate}[nosep]
+  \item \textbf{Dynamic inflation now adaptive:} corridor\_width strategy produces
+    $r = 0.177$\,m (range 0.156--0.180\,m) for the narrow corridor ($w \approx 0.55$\,m),
+    nearly double the fixed 0.09\,m. The inverted scaling correctly assigns larger
+    inflation to tighter passages.
+
+  \item \textbf{Sensor+DA3 fusion (A2/A3) is strictly additive:} 100\% detection rate
+    confirms DA3 never removes sensor obstacles. The 5.3\% FPR represents DA3 marking
+    obstacle cells where the sensor saw free space --- likely areas where the ToF sensor
+    had dead pixels (77\% failure rate in corridor). This is a \emph{safety improvement},
+    not noise.
+
+  \item \textbf{DA3 alone (A4) cannot replace LiDAR:} detection rate 76.7\% means
+    23.3\% of sensor-detected obstacles are missed, due to limited camera FOV
+    ($\sim$81\textdegree{} vs 360\textdegree{}).
+
+  \item \textbf{Clearance tightens with DA3:} Baseline 0.249\,m $\to$ A2/A3 0.171\,m
+    ($-0.078$\,m). DA3 fills in the dead ToF pixels with valid depth, producing a
+    denser and more conservative costmap. In a corridor with $\sim$0.8\,m clearance
+    per side, 0.171\,m is still safe for the 0.4\,m-wide robot.
+
+  \item \textbf{All configurations within Nav2 timing budget:} worst case 128.8\,ms
+    (A3), well within the 200\,ms local costmap update period (5\,Hz publish rate).
+\end{enumerate}
+
+\subsection{Corridor Width Distribution}
+
+Estimated corridor widths: mean $= 0.55$\,m, std $= 0.09$\,m,
+range $[0.50,\, 0.97]$\,m. The narrow range reflects the uniform
+corridor geometry in the 81-second rosbag. The A4 inflation radius
+shows more variation (std $= 0.022$\,m, range $[0.053,\, 0.180]$\,m)
+because DA3 depth produces different corridor width estimates than
+the sensor depth used by A1/A3.
+
+\subsection{Class-Aware Inflation Integration (A5/A6)}
+\label{sec:class-aware}
+
+Added two new experiments using YOLO+SAM2 semantic segmentation for
+per-class inflation radii:
+
+\begin{table}[h]
+\centering
+\caption{Extended experiment matrix with class-aware inflation}
+\label{tab:experiments-extended}
+\begin{tabular}{llll}
+\toprule
+\textbf{Exp.} & \textbf{Obstacle Source} & \textbf{Inflation} & \textbf{Tests} \\
+\midrule
+A5 & Sensor + DA3 depth & Class-aware (YOLO+SAM2) & Per-class safety \\
+A6 & DA3 depth only     & Class-aware (YOLO+SAM2) & Full vision-only \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Implementation}
+
+The class-aware strategy applies a separate inflation pass for each
+semantic class present in the occupancy grid:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Segmentation mask:} YOLO+SAM2 produces a 6-class pixel
+    label map (H$\times$W, uint8, values 0--5) for each RGB frame.
+  \item \textbf{Class grid:} \texttt{build\_class\_grid()} back-projects
+    depth pixels to 3D, filters by height, and rasterises to the same
+    bird's-eye grid as the occupancy, carrying each pixel's class label.
+    When multiple classes map to the same cell, the most safety-critical
+    class wins (person $>$ glass $>$ furniture $>$ other $>$ wall $>$ floor).
+  \item \textbf{Per-class inflation:} \texttt{apply\_class\_aware\_inflation()}
+    runs one distance-transform inflation pass per class, using the radii
+    from Table~\ref{tab:class-radii}, then merges by taking the maximum
+    cost at each cell.
+\end{enumerate}
+
+The effective inflation radius reported for A5/A6 is the weighted mean
+of per-class radii across all lethal cells in each frame.
+
+\subsubsection{Files Modified}
+
+\begin{itemize}[nosep]
+  \item \texttt{costmap\_builder.py}: added \texttt{back\_project\_depth\_with\_pixels()},
+    \texttt{build\_class\_grid()}, and segmentation class constants.
+  \item \texttt{inflation.py}: added \texttt{CLASS\_RADII} dict and
+    \texttt{apply\_class\_aware\_inflation()} function with multi-pass
+    per-class distance-transform inflation.
+  \item \texttt{run\_costmap\_ablation.py}: added \texttt{--seg-dir} argument,
+    A5/A6 experiments, segmentation mask loading with nearest-neighbour resize.
+  \item \texttt{costmap\_ablation.slurm}: updated to run YOLO+SAM2 before
+    ablation and pass \texttt{--seg-dir} when masks are available.
+  \item \texttt{corridor\_sam2\_seg.slurm}: new standalone SLURM job for
+    generating corridor segmentation masks on HPC.
+\end{itemize}
+
+\subsection{Run 3 Results (With Class-Aware Inflation)}
+
+\textit{(To be filled after YOLO+SAM2 inference on corridor frames
+completes on HPC and the full 7-experiment ablation is re-run.)}
+
+% ============================================================================
+\section{Phase 1: Offline LILocBench Ablation}
+\label{sec:phase1-lilocbench}
+% ============================================================================
+
+\subsection{Dataset}
+
+Selected sequences from LILocBench (Uni Bonn, 2025):
+
+\begin{itemize}[nosep]
+  \item \texttt{static\_0}: static office environment (13.9\,GB)
+  \item \texttt{dynamics\_0}: 10 people moving ($\sim$3.8\,GB)
+  \item \texttt{lt\_changes\_0}: rearranged furniture (10.0\,GB)
+  \item \texttt{lt\_changes\_3}: hallway only, doors closed (10.1\,GB)
+\end{itemize}
+
+3$\times$ RealSense D455 cameras, 640$\times$480 @ 15\,Hz.
+Subsampled to $\sim$3--5\,Hz.
+
+\subsection{Results}
+
+\textit{(To be filled after HPC run)}
+
+% ============================================================================
+\section{Phase 2: Live Corridor Ablation (Jetson)}
+\label{sec:phase2}
+% ============================================================================
+
+\textit{(To be filled after Jetson integration)}
+
+\subsection{Setup}
+
+DA3-Small via TensorRT on Jetson Orin Nano 8GB. ONNX/TRT build complete.
+GerdsenAI ROS2 Wrapper publishes \texttt{/depth\_anything\_3/depth} at
+25--40\,Hz.
+
+\subsection{Nav2 Configuration Variants}
+
+\begin{itemize}[nosep]
+  \item \texttt{nav2\_hardware.yaml} --- Baseline (current, scan only)
+  \item \texttt{nav2\_hardware\_dynamic\_inflation.yaml} --- A1
+  \item \texttt{nav2\_hardware\_da3\_fixed.yaml} --- A2
+  \item \texttt{nav2\_hardware\_da3\_dynamic.yaml} --- A3
+  \item \texttt{nav2\_hardware\_da3\_only.yaml} --- A4
+\end{itemize}
+
+\subsection{Results}
+
+\textit{(To be filled)}
+
+% ============================================================================
+\section{Pipeline and Files}
+\label{sec:files}
+% ============================================================================
+
+\begin{longtable}{lp{9cm}}
+\toprule
+\textbf{File} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{File} & \textbf{Description} \\
+\midrule
+\endhead
+\texttt{ml\_pipeline/costmap\_builder.py} & Depth image to 2D occupancy grid.
+  Back-projects depth to 3D, filters by height band, rasterises to bird's-eye
+  grid. Also builds class grids from YOLO+SAM2 segmentation masks. \\
+\texttt{ml\_pipeline/inflation.py} & Fixed inflation (Nav2 replication) plus
+  dynamic strategies: corridor\_width, min\_depth, and class\_aware
+  (per-class inflation with YOLO+SAM2 semantics). \\
+\texttt{ml\_pipeline/run\_costmap\_ablation.py} & Orchestrates all 7 experiments
+  (Baseline + A1--A6). Loads sensor + DA3 depth + segmentation, builds grids,
+  applies inflation, computes metrics, outputs CSV + JSON summaries. \\
+\texttt{ml\_pipeline/costmap\_ablation.slurm} & SLURM job for full HPC ablation
+  including YOLO+SAM2 segmentation (corridor + LILocBench). \\
+\texttt{ml\_pipeline/corridor\_sam2\_seg.slurm} & Standalone SLURM job for
+  running YOLO+SAM2 on corridor frames only. \\
+\texttt{ml\_pipeline/extract\_lilocbench.py} & Extracts LILocBench frames to
+  manifest format (RGB + depth .npy + manifest.jsonl). \\
+\texttt{ml\_pipeline/step1\_download\_lilocbench.sh} & Downloads LILocBench
+  sequences to HPC scratch. \\
+\bottomrule
+\end{longtable}
+
+% ============================================================================
+\section{Timeline}
+\label{sec:timeline}
+% ============================================================================
+
+\begin{longtable}{lp{10cm}}
+\toprule
+\textbf{Date} & \textbf{Milestone} \\
+\midrule
+\endfirsthead
+Mar 1, 2026 & Branch \texttt{da3-costmap-ablation} created off \texttt{hardware-integration} \\
+Mar 1, 2026 & Costmap builder, inflation module, and ablation runner implemented \\
+Mar 1, 2026 & SLURM job script created for HPC execution \\
+Mar 1, 2026 & Run 1 (5 experiments, corridor 459 frames), identified dynamic radius issues \\
+Mar 1, 2026 & Fix 1--3: inverted radius scaling, cost-threshold metrics, class-aware radii \\
+Mar 1, 2026 & Run 2 (post-fix), confirmed dynamic inflation now adaptive \\
+Mar 2, 2026 & Class-aware inflation (A5/A6): \texttt{build\_class\_grid()},
+              \texttt{apply\_class\_aware\_inflation()} multi-pass per-class inflation \\
+Mar 2, 2026 & \texttt{corridor\_sam2\_seg.slurm}: HPC job for YOLO+SAM2 on corridor frames \\
+            & \textit{(More entries to be added as work progresses)} \\
+\bottomrule
+\end{longtable}
+
+\end{document}

@@ -1,0 +1,136 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{longtable}
+\usepackage{listings}
+
+\definecolor{codebg}{RGB}{245,245,245}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  breaklines=true,
+  columns=flexible,
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{NCHSB Changelog}
+\lhead{Hardware Integration}
+\rfoot{Page \thepage}
+
+\title{%
+  \textbf{NCHSB Hardware Integration Changelog} \\[0.5em]
+  \large Traxxas Maxx 4S Ackermann Robot --- ROS2 Nav2 Stack \\[0.3em]
+  \normalsize NYU MS Project --- Nishant Prabhu
+}
+\author{}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% ============================================================================
+\section{Repository Overview}
+% ============================================================================
+
+NCHSB (Narrow Corridor High-Speed Bot) is the ROS2 workspace for
+autonomous navigation of a Traxxas Maxx 4S Ackermann RC car in narrow
+indoor corridors. The robot uses:
+
+\begin{itemize}[nosep]
+  \item \textbf{LiDAR:} RPLiDAR A2M8 (360\textdegree{}, 18\,m range)
+  \item \textbf{Depth camera:} Orbbec Femto Bolt (ToF + RGB)
+  \item \textbf{Motor control:} Teensy 4.1 serial bridge
+  \item \textbf{Localisation:} EKF (wheel odom + IMU) + SLAM Toolbox
+  \item \textbf{Navigation:} Nav2 (MPPI controller, Hybrid-A* planner)
+  \item \textbf{Compute:} NVIDIA Jetson Orin Nano 8GB
+\end{itemize}
+
+% ============================================================================
+\section{Branch: hardware-integration}
+\label{sec:hw-integration}
+% ============================================================================
+
+\subsection{Initial Hardware Bringup}
+
+\begin{itemize}[nosep]
+  \item \texttt{rc\_hardware\_bringup} package: real sensor drivers replacing
+    Gazebo simulation
+  \item \texttt{nav2\_hardware.yaml}: Nav2 params tuned for real RPLiDAR A2M8
+    (18\,m range, Ackermann motion model)
+  \item \texttt{hardware\_bringup.launch.py}: staged launch
+    (sensors $\to$ EKF $\to$ SLAM $\to$ Nav2 $\to$ stamper $\to$ depth fusion)
+  \item \texttt{depth\_fusion.py}: confidence-gated depth fusion node
+    (skeleton---student model inference is a placeholder)
+  \item Hardware URDF, EKF config, SLAM Toolbox config
+\end{itemize}
+
+\subsection{Jetson Deploy Stack}
+
+\begin{itemize}[nosep]
+  \item \texttt{jetson\_deploy/}: DA3-Small + YOLOv8-nano via TensorRT FP16
+  \item GerdsenAI ROS2 Wrapper for DA3 (\texttt{/depth\_anything\_3/depth})
+  \item YOLO ROS2 node (\texttt{yolo\_node.py})
+  \item Combined launch file (\texttt{perception.launch.py})
+  \item Memory budget: $\sim$6.7\,GB fits in Jetson's 8\,GB
+\end{itemize}
+
+% ============================================================================
+\section{Branch: da3-costmap-ablation}
+\label{sec:da3-costmap}
+% ============================================================================
+
+Branched off \texttt{hardware-integration} on 2026-03-01. Purpose: evaluate
+DA3-driven local costmaps and dynamic inflation radius for Nav2.
+
+\subsection{Planned Changes}
+
+\begin{enumerate}[nosep]
+  \item \textbf{Nav2 YAML variants:} 5 configurations testing different
+    obstacle sources (scan-only, scan+DA3, DA3-only) with fixed and
+    dynamic inflation
+  \item \textbf{da3\_to\_pointcloud.py:} ROS2 node converting DA3 depth
+    image to \texttt{PointCloud2} for Nav2 obstacle layer
+  \item \textbf{dynamic\_inflation.py:} ROS2 node that estimates corridor
+    width from DA3 depth and dynamically updates
+    \texttt{inflation\_layer.inflation\_radius} via Nav2 parameter service
+  \item \textbf{perception\_nav.launch.py:} Combined launch for DA3 +
+    converter + Nav2
+\end{enumerate}
+
+% ============================================================================
+\section{File Change Log}
+\label{sec:files}
+% ============================================================================
+
+\begin{longtable}{lp{8cm}l}
+\toprule
+\textbf{File} & \textbf{Change} & \textbf{Date} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{File} & \textbf{Change} & \textbf{Date} \\
+\midrule
+\endhead
+\texttt{rc\_hardware\_bringup/} & Initial hardware bringup package & Feb 2026 \\
+\texttt{jetson\_deploy/} & DA3 + YOLO Jetson deployment stack & Feb 2026 \\
+\texttt{changelog.tex} & Created NCHSB changelog & Mar 1, 2026 \\
+\texttt{da3\_costmap\_changelog.tex} & DA3 costmap ablation study changelog (project root) & Mar 1, 2026 \\
+\texttt{ml\_pipeline/costmap\_builder.py} & Depth-to-occupancy-grid + cost-threshold metrics & Mar 1, 2026 \\
+\texttt{ml\_pipeline/inflation.py} & Fixed + dynamic inflation (corridor\_width, min\_depth, class\_aware via YOLO+SAM2) & Mar 1, 2026 \\
+\texttt{ml\_pipeline/run\_costmap\_ablation.py} & 5-experiment ablation runner (Baseline, A1--A4) & Mar 1, 2026 \\
+\texttt{ml\_pipeline/costmap\_ablation.slurm} & SLURM job for HPC execution & Mar 1, 2026 \\
+\multicolumn{3}{l}{\textit{(More entries to be added as work progresses)}} \\
+\bottomrule
+\end{longtable}
+
+\end{document}
