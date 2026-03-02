@@ -12,6 +12,8 @@ install(
   PROGRAMS
     rc_hardware_bringup/teensy_bridge.py
     rc_hardware_bringup/depth_fusion.py
+    rc_hardware_bringup/da3_to_pointcloud.py
+    rc_hardware_bringup/dynamic_inflation.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

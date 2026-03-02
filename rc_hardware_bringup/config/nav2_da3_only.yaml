@@ -1,0 +1,55 @@
+####################################################################
+# NAV2 COSTMAP — DA3 DEPTH ONLY (no LiDAR)
+#
+# For experiments A4/A6: evaluates whether DA3 monocular depth can
+# replace LiDAR as the sole obstacle source. The LiDAR scan source
+# is removed; only the DA3 PointCloud2 feeds the obstacle layer.
+####################################################################
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 10.0
+      publish_frequency: 5.0
+      global_frame: odom
+      robot_base_frame: base_link
+
+      footprint: "[[0.20, 0.08], [0.20, -0.08], [-0.10, -0.08], [-0.10, 0.08]]"
+
+      use_radius: false
+      use_sim_time: false
+      rolling_window: true
+      width: 6
+      height: 6
+      resolution: 0.05
+
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      footprint_padding: 0.0
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: true
+        subscribe_to_updates: true
+        track_unknown_space: false
+        lethal_cost_threshold: 80
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        observation_sources: da3_pointcloud
+        da3_pointcloud:
+          topic: /da3/pointcloud
+          sensor_frame: camera_color_optical_frame
+          data_type: PointCloud2
+          clearing: true
+          marking: true
+          obstacle_range: 5.0
+          raytrace_range: 5.5
+          max_obstacle_height: 0.5
+          min_obstacle_height: 0.05
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.09
+
+      always_send_full_costmap: True

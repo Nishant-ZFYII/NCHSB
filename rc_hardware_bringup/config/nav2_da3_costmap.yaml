@@ -1,0 +1,104 @@
+####################################################################
+# NAV2 PARAMETERS FOR DA3 COSTMAP ABLATION (Phase 2)
+#
+# Extends nav2_hardware.yaml with DA3 PointCloud2 as a second
+# obstacle source. Only the costmap sections differ — all other
+# parameters (controller, planner, AMCL, etc.) are inherited
+# from the base config via the launch file's params_file arg.
+#
+# Experiment variants are selected via launch arguments:
+#   use_da3:        true/false  (add DA3 pointcloud source)
+#   use_lidar:      true/false  (keep LiDAR scan source)
+#   inflation_mode: fixed/dynamic  (fixed radius vs dynamic node)
+#   inflation_radius: 0.09     (fixed radius value)
+####################################################################
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 10.0
+      publish_frequency: 5.0
+      global_frame: odom
+      robot_base_frame: base_link
+
+      footprint: "[[0.20, 0.08], [0.20, -0.08], [-0.10, -0.08], [-0.10, 0.08]]"
+
+      use_radius: false
+      use_sim_time: false
+      rolling_window: true
+      width: 6
+      height: 6
+      resolution: 0.05
+
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      footprint_padding: 0.0
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: true
+        subscribe_to_updates: true
+        track_unknown_space: false
+        lethal_cost_threshold: 80
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        observation_sources: scan da3_pointcloud
+        scan:
+          topic: /scan
+          sensor_frame: lidar_link
+          data_type: LaserScan
+          clearing: true
+          marking: true
+          obstacle_range: 6.0
+          raytrace_range: 8.0
+          max_obstacle_height: 0.5
+        da3_pointcloud:
+          topic: /da3/pointcloud
+          sensor_frame: camera_color_optical_frame
+          data_type: PointCloud2
+          clearing: false
+          marking: true
+          obstacle_range: 5.0
+          raytrace_range: 5.5
+          max_obstacle_height: 0.5
+          min_obstacle_height: 0.05
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.09
+
+      always_send_full_costmap: True
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: map
+      robot_base_frame: base_link
+      use_sim_time: false
+      rolling_window: false
+
+      footprint: "[[0.20, 0.08], [0.20, -0.08], [-0.10, -0.08], [-0.10, 0.08]]"
+
+      use_radius: false
+      resolution: 0.05
+      track_unknown_space: false
+      footprint_padding: 0.0
+
+      plugins: ["static_layer", "inflation_layer"]
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: true
+        subscribe_to_updates: true
+        track_unknown_space: false
+        lethal_cost_threshold: 80
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.08
+
+      always_send_full_costmap: True
