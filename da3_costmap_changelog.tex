@@ -312,8 +312,74 @@ of per-class radii across all lethal cells in each frame.
 
 \subsection{Run 3 Results (With Class-Aware Inflation)}
 
-\textit{(To be filled after YOLO+SAM2 inference on corridor frames
-completes on HPC and the full 7-experiment ablation is re-run.)}
+YOLO+SAM2 segmentation masks generated on HPC (SAM2-Hiera-Large +
+YOLOv8x, 459 frames). All 459/459 masks loaded successfully.
+
+\begin{table}[h]
+\centering
+\caption{Phase 1 corridor ablation --- Run 3 (459 frames, all 7 experiments)}
+\label{tab:phase1-run3}
+\begin{tabular}{lrrrrrrr}
+\toprule
+\textbf{Exp.} & \textbf{IoU} & \textbf{L-IoU} & \textbf{Det.Rate} & \textbf{FPR} & \textbf{Clear.} & \textbf{Radius} & \textbf{Time} \\
+\midrule
+Baseline & 1.000 & 1.000 & 1.000 & 0.000 & 0.249\,m & 0.090\,m & 13.8\,ms \\
+A1       & 1.000 & 1.000 & 1.000 & 0.000 & 0.249\,m & 0.177\,m & 51.3\,ms \\
+A2       & 0.379 & 0.295 & 1.000 & 0.053 & 0.171\,m & 0.090\,m & 71.7\,ms \\
+A3       & 0.379 & 0.295 & 1.000 & 0.053 & 0.171\,m & 0.177\,m & 109.1\,ms \\
+A4       & 0.279 & 0.226 & 0.767 & 0.053 & 0.175\,m & 0.165\,m & 108.5\,ms \\
+A5       & 0.379 & 0.295 & 1.000 & 0.053 & 0.171\,m & 0.192\,m & 163.3\,ms \\
+A6       & 0.279 & 0.226 & 0.767 & 0.053 & 0.175\,m & 0.197\,m & 149.6\,ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Key findings (Run 3):}
+\begin{enumerate}[nosep]
+  \item \textbf{Class-aware inflation produces larger radii:} A5 mean radius
+    $= 0.192$\,m (range 0.184--0.200\,m) vs A3 corridor\_width $= 0.177$\,m.
+    A6 mean $= 0.197$\,m vs A4 $= 0.165$\,m. The per-class radii (person 0.30\,m,
+    glass 0.20\,m, furniture 0.15\,m) pull the weighted average above the
+    corridor-width estimate, providing semantically motivated safety margins.
+
+  \item \textbf{A5 radius more stable than A4:} A5 std $= 0.0035$\,m vs
+    A4 std $= 0.022$\,m. Class-aware inflation adapts to \emph{what} is detected
+    rather than \emph{how narrow} the corridor appears, producing more consistent
+    behaviour across frames.
+
+  \item \textbf{IoU/detection unchanged between inflation strategies:} A5 matches
+    A2/A3 (IoU 0.379, L-IoU 0.295, DetRate 1.000) and A6 matches A4 (IoU 0.279,
+    L-IoU 0.226, DetRate 0.767). Inflation only changes the cost gradient
+    around obstacles, not which cells are lethal.
+
+  \item \textbf{Timing within budget:} worst case A5 at 163.3\,ms, still
+    under the 200\,ms Nav2 local costmap update period. The multi-pass
+    per-class inflation adds $\sim$54\,ms over A3.
+
+  \item \textbf{Static corridor limits differentiation:} the corridor contains
+    mostly walls and floor with few dynamic obstacles (no people during recording).
+    The LILocBench \texttt{dynamics\_0} sequence (10 people moving) will better
+    exercise the per-class radii, especially the person class (0.30\,m).
+\end{enumerate}
+
+\subsubsection{Class-Aware Inflation Radii Statistics}
+
+\begin{table}[h]
+\centering
+\caption{Per-experiment inflation radius statistics (Run 3)}
+\label{tab:radius-stats}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Exp.} & \textbf{Mean (m)} & \textbf{Std (m)} & \textbf{Min (m)} & \textbf{Max (m)} \\
+\midrule
+A1 & 0.1774 & 0.0047 & 0.1557 & 0.1800 \\
+A3 & 0.1774 & 0.0047 & 0.1557 & 0.1800 \\
+A4 & 0.1647 & 0.0215 & 0.0532 & 0.1800 \\
+A5 & 0.1916 & 0.0035 & 0.1836 & 0.2000 \\
+A6 & 0.1969 & 0.0025 & 0.1872 & 0.2016 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % ============================================================================
 \section{Phase 1: Offline LILocBench Ablation}
@@ -418,6 +484,7 @@ Mar 1, 2026 & Run 2 (post-fix), confirmed dynamic inflation now adaptive \\
 Mar 2, 2026 & Class-aware inflation (A5/A6): \texttt{build\_class\_grid()},
               \texttt{apply\_class\_aware\_inflation()} multi-pass per-class inflation \\
 Mar 2, 2026 & \texttt{corridor\_sam2\_seg.slurm}: HPC job for YOLO+SAM2 on corridor frames \\
+Mar 2, 2026 & YOLO+SAM2 run on HPC (459 masks), Run 3 with all 7 experiments complete \\
             & \textit{(More entries to be added as work progresses)} \\
 \bottomrule
 \end{longtable}
