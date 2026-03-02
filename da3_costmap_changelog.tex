@@ -409,23 +409,81 @@ Subsampled to $\sim$3--5\,Hz.
 \label{sec:phase2}
 % ============================================================================
 
-\textit{(To be filled after Jetson integration)}
-
 \subsection{Setup}
 
 DA3-Small via TensorRT on Jetson Orin Nano 8GB. ONNX/TRT build complete.
 GerdsenAI ROS2 Wrapper publishes \texttt{/depth\_anything\_3/depth} at
 25--40\,Hz.
 
+Local development GPU: NVIDIA GTX 1060 6\,GB (PyTorch 2.7.1+cu118,
+CUDA capability sm\_61).
+
+\subsection{ROS2 Nodes Implemented}
+
+\subsubsection{da3\_to\_pointcloud.py}
+
+Converts DA3 monocular depth images to \texttt{PointCloud2} messages
+for Nav2's \texttt{ObstacleLayer}:
+
+\begin{itemize}[nosep]
+  \item Subscribes to \texttt{/depth\_anything\_3/depth} (float32 Image)
+    and \texttt{/camera/color/camera\_info} (for intrinsics)
+  \item Back-projects valid depth pixels to 3D points in the camera
+    optical frame
+  \item Filters by height band (\texttt{min\_height}--\texttt{max\_height}
+    above ground), matching the offline \texttt{costmap\_builder.py} logic
+  \item Publishes \texttt{/da3/pointcloud} (\texttt{PointCloud2}) at
+    camera frame rate
+  \item Configurable downsample factor (default 4$\times$) for
+    performance
+\end{itemize}
+
+\subsubsection{dynamic\_inflation.py}
+
+Adjusts Nav2's local costmap \texttt{inflation\_radius} parameter
+in real-time via \texttt{SetParameters} service:
+
+\begin{itemize}[nosep]
+  \item Subscribes to YOLO \texttt{Detection2DArray} and DA3 depth
+  \item Strategies: \texttt{class\_aware} (person$=$0.30\,m,
+    furniture$=$0.15\,m, other$=$0.12\,m), \texttt{corridor\_width},
+    \texttt{min\_depth}, \texttt{fixed}
+  \item Falls back to depth-based radius when no detections are present
+  \item Updates at 5\,Hz, only when radius change exceeds 5\,mm
+    (avoids parameter churn)
+\end{itemize}
+
 \subsection{Nav2 Configuration Variants}
 
 \begin{itemize}[nosep]
-  \item \texttt{nav2\_hardware.yaml} --- Baseline (current, scan only)
-  \item \texttt{nav2\_hardware\_dynamic\_inflation.yaml} --- A1
-  \item \texttt{nav2\_hardware\_da3\_fixed.yaml} --- A2
-  \item \texttt{nav2\_hardware\_da3\_dynamic.yaml} --- A3
-  \item \texttt{nav2\_hardware\_da3\_only.yaml} --- A4
+  \item \texttt{nav2\_hardware.yaml} --- Baseline (scan only, fixed 0.09\,m)
+  \item \texttt{nav2\_da3\_costmap.yaml} --- scan + DA3 \texttt{PointCloud2}
+    fused obstacle layer (for A2/A3/A5)
+  \item \texttt{nav2\_da3\_only.yaml} --- DA3 \texttt{PointCloud2} only,
+    no LiDAR (for A4/A6)
 \end{itemize}
+
+Dynamic inflation (A1/A3/A5/A6) is handled by the
+\texttt{dynamic\_inflation} node rather than separate YAML files,
+keeping the configuration matrix manageable.
+
+\subsection{Launch File}
+
+\texttt{da3\_costmap.launch.py} brings up the perception stack:
+
+\begin{lstlisting}
+# Scan + DA3, fixed inflation (A2):
+ros2 launch rc_hardware_bringup da3_costmap.launch.py
+
+# Scan + DA3, class-aware inflation (A5):
+ros2 launch rc_hardware_bringup da3_costmap.launch.py \
+    inflation_strategy:=class_aware
+
+# DA3-only, class-aware (A6):
+ros2 launch rc_hardware_bringup da3_costmap.launch.py \
+    inflation_strategy:=class_aware
+# (with nav2_da3_only.yaml as Nav2 params)
+\end{lstlisting}
 
 \subsection{Results}
 
@@ -462,6 +520,21 @@ GerdsenAI ROS2 Wrapper publishes \texttt{/depth\_anything\_3/depth} at
   manifest format (RGB + depth .npy + manifest.jsonl). \\
 \texttt{ml\_pipeline/step1\_download\_lilocbench.sh} & Downloads LILocBench
   sequences to HPC scratch. \\
+\midrule
+\multicolumn{2}{l}{\textbf{Phase 2: ROS2 Live Integration (NCHSB)}} \\
+\midrule
+\texttt{rc\_hardware\_bringup/da3\_to\_pointcloud.py} & ROS2 node:
+  DA3 depth image $\to$ \texttt{PointCloud2} for Nav2 \texttt{ObstacleLayer}.
+  Back-projects, height-filters, publishes at camera rate. \\
+\texttt{rc\_hardware\_bringup/dynamic\_inflation.py} & ROS2 node:
+  adjusts Nav2 \texttt{inflation\_radius} via \texttt{SetParameters}
+  based on YOLO detections (class\_aware, corridor\_width, min\_depth). \\
+\texttt{config/nav2\_da3\_costmap.yaml} & Nav2 config with scan + DA3
+  \texttt{PointCloud2} fused obstacle layer. \\
+\texttt{config/nav2\_da3\_only.yaml} & Nav2 config with DA3-only
+  obstacle layer (no LiDAR). \\
+\texttt{launch/da3\_costmap.launch.py} & Launch file for DA3 perception
+  stack with configurable inflation strategy. \\
 \bottomrule
 \end{longtable}
 
@@ -485,6 +558,13 @@ Mar 2, 2026 & Class-aware inflation (A5/A6): \texttt{build\_class\_grid()},
               \texttt{apply\_class\_aware\_inflation()} multi-pass per-class inflation \\
 Mar 2, 2026 & \texttt{corridor\_sam2\_seg.slurm}: HPC job for YOLO+SAM2 on corridor frames \\
 Mar 2, 2026 & YOLO+SAM2 run on HPC (459 masks), Run 3 with all 7 experiments complete \\
+Mar 2, 2026 & PyTorch 2.7.1+cu118 installed locally (GTX 1060 sm\_61 support) \\
+Mar 2, 2026 & Phase 2 ROS2 nodes: \texttt{da3\_to\_pointcloud.py},
+              \texttt{dynamic\_inflation.py} \\
+Mar 2, 2026 & Nav2 configs: \texttt{nav2\_da3\_costmap.yaml} (fused),
+              \texttt{nav2\_da3\_only.yaml} (DA3-only) \\
+Mar 2, 2026 & \texttt{da3\_costmap.launch.py}: perception launch with
+              configurable inflation strategy \\
             & \textit{(More entries to be added as work progresses)} \\
 \bottomrule
 \end{longtable}
