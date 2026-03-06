@@ -169,237 +169,144 @@
       </link>
     </model>
 
-    <!-- Wall-mounted features for LiDAR/SLAM scan matching -->
+    <!--
+      SLAM features: aperiodic spacing, 3 size classes, non-alternating types.
+      All inter-feature gaps are distinct so no two positions share a scan signature.
+      South gaps: 4.5, 2.9, 5.3, 3.8m  |  North gaps: 2.5, 4.2, 2.3, 3.8, 3.2m
+      Feature sizes: pillar 0.15x0.15, large-pillar 0.20x0.20, cabinet 0.40x0.12
+    -->
     <!-- South wall features (protrude toward y=0) -->
+    <!-- feat_s1: pillar at x=-8.2, gap to next=4.5m -->
     <model name="feat_s1">
       <static>true</static>
-      <pose>-7.5 0.875 0.25 0 0 0</pose>
+      <pose>-8.2 0.875 0.25 0 0 0</pose>
       <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.15 0.15 0.5</size></box>
-          </geometry>
-        </collision>
+        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
         <visual name="visual">
-          <geometry>
-            <box><size>0.15 0.15 0.5</size></box>
-          </geometry>
-          <material>
-            <ambient>0.4 0.3 0.25 1</ambient>
-            <diffuse>0.5 0.4 0.35 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
+    <!-- feat_s2: wide cabinet at x=-3.7, gap to next=2.9m -->
     <model name="feat_s2">
       <static>true</static>
-      <pose>-4.0 0.89 0.125 0 0 0</pose>
+      <pose>-3.7 0.885 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.3 0.12 0.25</size></box>
-          </geometry>
-        </collision>
+        <collision name="collision"><geometry><box><size>0.40 0.12 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry>
-            <box><size>0.3 0.12 0.25</size></box>
-          </geometry>
-          <material>
-            <ambient>0.25 0.3 0.4 1</ambient>
-            <diffuse>0.35 0.4 0.5 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
+          <geometry><box><size>0.40 0.12 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
+    <!-- feat_s3: large pillar at x=-0.8, gap to next=5.3m -->
     <model name="feat_s3">
       <static>true</static>
-      <pose>-0.5 0.875 0.25 0 0 0</pose>
+      <pose>-0.8 0.85 0.25 0 0 0</pose>
       <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.15 0.15 0.5</size></box>
-          </geometry>
-        </collision>
+        <collision name="collision"><geometry><box><size>0.20 0.20 0.5</size></box></geometry></collision>
         <visual name="visual">
-          <geometry>
-            <box><size>0.15 0.15 0.5</size></box>
-          </geometry>
-          <material>
-            <ambient>0.4 0.3 0.25 1</ambient>
-            <diffuse>0.5 0.4 0.35 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
+          <geometry><box><size>0.20 0.20 0.5</size></box></geometry>
+          <material><ambient>0.45 0.25 0.2 1</ambient><diffuse>0.55 0.35 0.3 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
+    <!-- feat_s4: cabinet at x=4.5, gap to next=3.8m -->
     <model name="feat_s4">
       <static>true</static>
-      <pose>3.5 0.89 0.125 0 0 0</pose>
+      <pose>4.5 0.885 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.3 0.12 0.25</size></box>
-          </geometry>
-        </collision>
+        <collision name="collision"><geometry><box><size>0.30 0.12 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry>
-            <box><size>0.3 0.12 0.25</size></box>
-          </geometry>
-          <material>
-            <ambient>0.25 0.3 0.4 1</ambient>
-            <diffuse>0.35 0.4 0.5 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
+          <geometry><box><size>0.30 0.12 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
+    <!-- feat_s5: pillar at x=8.3 -->
     <model name="feat_s5">
       <static>true</static>
-      <pose>7.0 0.875 0.25 0 0 0</pose>
+      <pose>8.3 0.875 0.25 0 0 0</pose>
       <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.15 0.15 0.5</size></box>
-          </geometry>
-        </collision>
+        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
         <visual name="visual">
-          <geometry>
-            <box><size>0.15 0.15 0.5</size></box>
-          </geometry>
-          <material>
-            <ambient>0.4 0.3 0.25 1</ambient>
-            <diffuse>0.5 0.4 0.35 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
+
     <!-- North wall features (protrude toward y=0) -->
+    <!-- feat_n1: cabinet at x=-7.0, gap to next=2.5m -->
     <model name="feat_n1">
       <static>true</static>
-      <pose>-8.5 -0.89 0.125 0 0 0</pose>
+      <pose>-7.0 -0.885 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.3 0.12 0.25</size></box>
-          </geometry>
-        </collision>
+        <collision name="collision"><geometry><box><size>0.30 0.12 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry>
-            <box><size>0.3 0.12 0.25</size></box>
-          </geometry>
-          <material>
-            <ambient>0.25 0.3 0.4 1</ambient>
-            <diffuse>0.35 0.4 0.5 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
+          <geometry><box><size>0.30 0.12 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
+    <!-- feat_n2: pillar at x=-4.5, gap to next=4.2m -->
     <model name="feat_n2">
       <static>true</static>
-      <pose>-5.5 -0.875 0.25 0 0 0</pose>
+      <pose>-4.5 -0.875 0.25 0 0 0</pose>
       <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.15 0.15 0.5</size></box>
-          </geometry>
-        </collision>
+        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
         <visual name="visual">
-          <geometry>
-            <box><size>0.15 0.15 0.5</size></box>
-          </geometry>
-          <material>
-            <ambient>0.4 0.3 0.25 1</ambient>
-            <diffuse>0.5 0.4 0.35 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
+    <!-- feat_n3: wide cabinet at x=-0.3, gap to next=2.3m -->
     <model name="feat_n3">
       <static>true</static>
-      <pose>-2.5 -0.89 0.125 0 0 0</pose>
+      <pose>-0.3 -0.885 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.3 0.12 0.25</size></box>
-          </geometry>
-        </collision>
+        <collision name="collision"><geometry><box><size>0.40 0.12 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry>
-            <box><size>0.3 0.12 0.25</size></box>
-          </geometry>
-          <material>
-            <ambient>0.25 0.3 0.4 1</ambient>
-            <diffuse>0.35 0.4 0.5 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
+          <geometry><box><size>0.40 0.12 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
+    <!-- feat_n4: large pillar at x=2.0, gap to next=3.8m -->
     <model name="feat_n4">
       <static>true</static>
-      <pose>1.0 -0.875 0.25 0 0 0</pose>
+      <pose>2.0 -0.85 0.25 0 0 0</pose>
       <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.15 0.15 0.5</size></box>
-          </geometry>
-        </collision>
+        <collision name="collision"><geometry><box><size>0.20 0.20 0.5</size></box></geometry></collision>
         <visual name="visual">
-          <geometry>
-            <box><size>0.15 0.15 0.5</size></box>
-          </geometry>
-          <material>
-            <ambient>0.4 0.3 0.25 1</ambient>
-            <diffuse>0.5 0.4 0.35 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
+          <geometry><box><size>0.20 0.20 0.5</size></box></geometry>
+          <material><ambient>0.45 0.25 0.2 1</ambient><diffuse>0.55 0.35 0.3 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
+    <!-- feat_n5: cabinet at x=5.8, gap to next=3.2m -->
     <model name="feat_n5">
       <static>true</static>
-      <pose>5.0 -0.89 0.125 0 0 0</pose>
+      <pose>5.8 -0.885 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.3 0.12 0.25</size></box>
-          </geometry>
-        </collision>
+        <collision name="collision"><geometry><box><size>0.30 0.12 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry>
-            <box><size>0.3 0.12 0.25</size></box>
-          </geometry>
-          <material>
-            <ambient>0.25 0.3 0.4 1</ambient>
-            <diffuse>0.35 0.4 0.5 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
+          <geometry><box><size>0.30 0.12 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
+    <!-- feat_n6: pillar at x=9.0 -->
     <model name="feat_n6">
       <static>true</static>
-      <pose>8.5 -0.875 0.25 0 0 0</pose>
+      <pose>9.0 -0.875 0.25 0 0 0</pose>
       <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.15 0.15 0.5</size></box>
-          </geometry>
-        </collision>
+        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
         <visual name="visual">
-          <geometry>
-            <box><size>0.15 0.15 0.5</size></box>
-          </geometry>
-          <material>
-            <ambient>0.4 0.3 0.25 1</ambient>
-            <diffuse>0.5 0.4 0.35 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>

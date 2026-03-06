@@ -10,9 +10,9 @@
   - 4 corners for turning, continuous loop path
 
   SLAM features:
-  - 28 wall-mounted box protrusions (pillars 0.15x0.15x0.5, cabinets 0.3x0.12x0.25)
-  - Irregular spacing on inner and outer walls for unique scan patterns
-  - Features protrude 0.075m from wall inner face into corridor
+  - 23 wall-mounted protrusions: 3 size classes (pillar 0.15x0.15, large-pillar 0.20x0.20, cabinet 0.30-0.40x0.12)
+  - Aperiodic spacing: all inter-feature gaps are distinct per wall segment
+  - 4 corners serve as additional natural SLAM landmarks
 
   Default robot spawn: x=-8.0, y=-4.0, yaw=0.0 (bottom corridor, heading +X)
 -->
@@ -226,11 +226,20 @@
       </link>
     </model>
 
-    <!-- ========== SLAM FEATURES (irregular spacing, ~28 total) ========== -->
-    <!-- South outer wall features (protrude +Y into corridor) -->
+    <!--
+      SLAM features: aperiodic spacing + 3 size classes + corners as natural landmarks.
+      Each corridor leg has features at unique gaps so no two positions share a scan signature.
+      Sizes: pillar 0.15x0.15, large-pillar 0.20x0.20, cabinet 0.30x0.12, wide-cabinet 0.40x0.12
+      Bottom leg (20m): outer gaps 3.2,7.1,4.8  inner gaps 4.6,6.2,3.7
+      Top leg (20m):    outer gaps 5.3,4.1,6.8  inner gaps 3.5,5.8,4.2
+      Left leg (10m):   outer gaps 2.8,4.5       inner gaps 3.3,2.2
+      Right leg (10m):  outer gaps 3.7,2.8       inner gaps 2.5,3.8
+    -->
+
+    <!-- === BOTTOM LEG: South outer wall (protrude +Y) === -->
     <model name="feat_1">
       <static>true</static>
-      <pose>-7.5 -4.825 0.25 0 0 0</pose>
+      <pose>-7.8 -4.825 0.25 0 0 0</pose>
       <link name="link">
         <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
         <visual name="visual">
@@ -241,53 +250,53 @@
     </model>
     <model name="feat_2">
       <static>true</static>
-      <pose>-2.3 -4.825 0.125 0 0 0</pose>
+      <pose>-4.6 -4.83 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.40 0.12 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <geometry><box><size>0.40 0.12 0.25</size></box></geometry>
           <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
     <model name="feat_3">
       <static>true</static>
-      <pose>3.8 -4.825 0.25 0 0 0</pose>
+      <pose>2.5 -4.825 0.25 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.20 0.20 0.5</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
-          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+          <geometry><box><size>0.20 0.20 0.5</size></box></geometry>
+          <material><ambient>0.45 0.25 0.2 1</ambient><diffuse>0.55 0.35 0.3 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
     <model name="feat_4">
       <static>true</static>
-      <pose>8.1 -4.825 0.125 0 0 0</pose>
+      <pose>7.3 -4.83 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.30 0.12 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <geometry><box><size>0.30 0.12 0.25</size></box></geometry>
           <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
 
-    <!-- North outer wall features (protrude -Y into corridor) -->
+    <!-- South inner wall (protrude -Y into bottom corridor) -->
     <model name="feat_5">
       <static>true</static>
-      <pose>-8.2 4.825 0.125 0 0 0</pose>
+      <pose>-5.8 -3.175 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.30 0.12 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <geometry><box><size>0.30 0.12 0.25</size></box></geometry>
           <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
     <model name="feat_6">
       <static>true</static>
-      <pose>-1.5 4.825 0.25 0 0 0</pose>
+      <pose>-1.2 -3.175 0.25 0 0 0</pose>
       <link name="link">
         <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
         <visual name="visual">
@@ -298,53 +307,42 @@
     </model>
     <model name="feat_7">
       <static>true</static>
-      <pose>4.5 4.825 0.125 0 0 0</pose>
+      <pose>5.0 -3.18 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.40 0.12 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <geometry><box><size>0.40 0.12 0.25</size></box></geometry>
           <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
+
+    <!-- === TOP LEG: North outer wall (protrude -Y) === -->
     <model name="feat_8">
       <static>true</static>
-      <pose>9.0 4.825 0.25 0 0 0</pose>
+      <pose>-6.5 4.825 0.25 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.20 0.20 0.5</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
-          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+          <geometry><box><size>0.20 0.20 0.5</size></box></geometry>
+          <material><ambient>0.45 0.25 0.2 1</ambient><diffuse>0.55 0.35 0.3 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
-
-    <!-- West outer wall features (protrude +X into corridor) -->
     <model name="feat_9">
       <static>true</static>
-      <pose>-9.825 -4.2 0.25 0 0 0</pose>
+      <pose>-1.2 4.83 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.30 0.12 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
-          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+          <geometry><box><size>0.30 0.12 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
     <model name="feat_10">
       <static>true</static>
-      <pose>-9.825 -0.8 0.125 0 0 0</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>0.12 0.3 0.25</size></box></geometry></collision>
-        <visual name="visual">
-          <geometry><box><size>0.12 0.3 0.25</size></box></geometry>
-          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
-        </visual>
-      </link>
-    </model>
-    <model name="feat_11">
-      <static>true</static>
-      <pose>-9.825 3.5 0.25 0 0 0</pose>
+      <pose>2.9 4.825 0.25 0 0 0</pose>
       <link name="link">
         <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
         <visual name="visual">
@@ -354,45 +352,56 @@
       </link>
     </model>
 
-    <!-- East outer wall features (protrude -X into corridor) -->
+    <!-- North inner wall (protrude +Y into top corridor) -->
+    <model name="feat_11">
+      <static>true</static>
+      <pose>-5.2 3.175 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
     <model name="feat_12">
       <static>true</static>
-      <pose>9.825 -3.8 0.125 0 0 0</pose>
+      <pose>0.6 3.18 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.12 0.3 0.25</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.40 0.12 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.12 0.3 0.25</size></box></geometry>
+          <geometry><box><size>0.40 0.12 0.25</size></box></geometry>
           <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
     <model name="feat_13">
       <static>true</static>
-      <pose>9.825 0.5 0.25 0 0 0</pose>
+      <pose>6.4 3.175 0.25 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.20 0.20 0.5</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
-          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
-        </visual>
-      </link>
-    </model>
-    <model name="feat_14">
-      <static>true</static>
-      <pose>9.825 4.2 0.125 0 0 0</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
-        <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
-          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+          <geometry><box><size>0.20 0.20 0.5</size></box></geometry>
+          <material><ambient>0.45 0.25 0.2 1</ambient><diffuse>0.55 0.35 0.3 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
 
-    <!-- South inner wall features (protrude -Y into corridor) -->
+    <!-- === LEFT LEG: West outer wall (protrude +X) === -->
+    <model name="feat_14">
+      <static>true</static>
+      <pose>-9.825 -3.5 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.12 0.30 0.25</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.12 0.30 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
     <model name="feat_15">
       <static>true</static>
-      <pose>-6.2 -3.175 0.25 0 0 0</pose>
+      <pose>-9.825 -0.7 0.25 0 0 0</pose>
       <link name="link">
         <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
         <visual name="visual">
@@ -403,18 +412,20 @@
     </model>
     <model name="feat_16">
       <static>true</static>
-      <pose>-1.0 -3.175 0.125 0 0 0</pose>
+      <pose>-9.825 3.8 0.25 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.20 0.20 0.5</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
-          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+          <geometry><box><size>0.20 0.20 0.5</size></box></geometry>
+          <material><ambient>0.45 0.25 0.2 1</ambient><diffuse>0.55 0.35 0.3 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
+
+    <!-- West inner wall (protrude +X into left corridor) -->
     <model name="feat_17">
       <static>true</static>
-      <pose>4.5 -3.175 0.25 0 0 0</pose>
+      <pose>-8.175 -1.8 0.25 0 0 0</pose>
       <link name="link">
         <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
         <visual name="visual">
@@ -425,128 +436,71 @@
     </model>
     <model name="feat_18">
       <static>true</static>
-      <pose>7.8 -3.175 0.125 0 0 0</pose>
+      <pose>-8.175 1.5 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.12 0.40 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <geometry><box><size>0.12 0.40 0.25</size></box></geometry>
           <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
 
-    <!-- North inner wall features (protrude +Y into corridor) -->
+    <!-- === RIGHT LEG: East outer wall (protrude -X) === -->
     <model name="feat_19">
       <static>true</static>
-      <pose>-7.0 3.175 0.125 0 0 0</pose>
+      <pose>9.825 -2.8 0.25 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.20 0.20 0.5</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
-          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+          <geometry><box><size>0.20 0.20 0.5</size></box></geometry>
+          <material><ambient>0.45 0.25 0.2 1</ambient><diffuse>0.55 0.35 0.3 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
     <model name="feat_20">
       <static>true</static>
-      <pose>0.2 3.175 0.25 0 0 0</pose>
+      <pose>9.825 0.9 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.12 0.30 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
-          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+          <geometry><box><size>0.12 0.30 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
     <model name="feat_21">
       <static>true</static>
-      <pose>5.5 3.175 0.125 0 0 0</pose>
+      <pose>9.825 3.7 0.25 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
-          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
+
+    <!-- East inner wall (protrude -X into right corridor) -->
     <model name="feat_22">
       <static>true</static>
-      <pose>7.2 3.175 0.25 0 0 0</pose>
+      <pose>8.175 -2.0 0.125 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.12 0.40 0.25</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
-          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+          <geometry><box><size>0.12 0.40 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>
-
-    <!-- West inner wall features (protrude -X into corridor) -->
     <model name="feat_23">
       <static>true</static>
-      <pose>-8.175 -2.5 0.25 0 0 0</pose>
+      <pose>8.175 1.8 0.25 0 0 0</pose>
       <link name="link">
         <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
         <visual name="visual">
           <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
           <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
-        </visual>
-      </link>
-    </model>
-    <model name="feat_24">
-      <static>true</static>
-      <pose>-8.175 0.5 0.125 0 0 0</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>0.12 0.3 0.25</size></box></geometry></collision>
-        <visual name="visual">
-          <geometry><box><size>0.12 0.3 0.25</size></box></geometry>
-          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
-        </visual>
-      </link>
-    </model>
-    <model name="feat_25">
-      <static>true</static>
-      <pose>-8.175 2.8 0.25 0 0 0</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
-        <visual name="visual">
-          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
-          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
-        </visual>
-      </link>
-    </model>
-
-    <!-- East inner wall features (protrude +X into corridor) -->
-    <model name="feat_26">
-      <static>true</static>
-      <pose>8.175 -2.2 0.125 0 0 0</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>0.12 0.3 0.25</size></box></geometry></collision>
-        <visual name="visual">
-          <geometry><box><size>0.12 0.3 0.25</size></box></geometry>
-          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
-        </visual>
-      </link>
-    </model>
-    <model name="feat_27">
-      <static>true</static>
-      <pose>8.175 1.0 0.25 0 0 0</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
-        <visual name="visual">
-          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
-          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
-        </visual>
-      </link>
-    </model>
-    <model name="feat_28">
-      <static>true</static>
-      <pose>8.175 2.5 0.125 0 0 0</pose>
-      <link name="link">
-        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
-        <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
-          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
         </visual>
       </link>
     </model>

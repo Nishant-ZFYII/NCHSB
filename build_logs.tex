@@ -301,4 +301,30 @@ Metrics/Analysis (Phase 7) & \textcolor{issuered}{Pending} & \texttt{metrics\_lo
 \end{tabular}
 \end{center}
 
+\logentry{2026-03-05 -- Fixed Periodic Feature Spacing}
+\begin{itemize}
+  \item \issue{Wall features had near-uniform spacing (3.0--3.5m gaps repeating). This creates a periodic scan pattern that SLAM can still alias between positions --- e.g.\ the scan at x=-4 looks nearly identical to x=3.5 in the straight corridor.}
+  \item \fix{Redesigned feature layout for \texttt{corridor\_straight.sdf} and \texttt{corridor\_loop.sdf}:
+    \begin{itemize}
+      \item \textbf{Aperiodic gaps}: all inter-feature spacings are distinct (e.g.\ south wall: 4.5, 2.9, 5.3, 3.8m).
+      \item \textbf{3 size classes}: pillar (0.15$\times$0.15), large-pillar (0.20$\times$0.20), cabinet (0.30--0.40$\times$0.12). Varied widths create different LiDAR bump widths.
+      \item \textbf{Non-alternating types}: consecutive same-type features break simple alternating patterns.
+      \item \textbf{Asymmetric cross-wall}: south and north features are NOT mirror images; combined signature is unique everywhere.
+    \end{itemize}
+  }
+  \item \note{L-turn, T-junction, narrow, and doorway corridors are less vulnerable because corners, width changes, and alcoves already provide strong natural landmarks. Their features were kept as-is.}
+  \item \note{Loop corridor reduced from 28 to 23 features; 4 corners serve as natural landmarks.}
+\end{itemize}
+
+\section*{Future Work / Nice-to-Haves}
+\begin{itemize}
+  \item \textbf{AWS RoboMaker Hospital World for visual fidelity}: The \texttt{aws-robomaker-hospital-world} (GitHub: \texttt{aws-robotics/aws-robomaker-hospital-world}) provides a detailed hospital environment with corridors, rooms, furniture, and human models. However:
+    \begin{itemize}
+      \item It targets Gazebo Classic (7.14+ / 9.16+), NOT Ignition Fortress --- incompatible plugin APIs.
+      \item The ``humans'' are static mesh models (ElderLadyPatient, etc.), not moving pedestrians.
+      \item Porting the full world is multi-day effort and out of scope.
+    \end{itemize}
+    \textbf{Middle ground}: Many furniture models (chairs, carts, cabinets) referenced in the hospital world are hosted on Ignition Fuel (\texttt{fuel.ignitionrobotics.org}) and work natively with Fortress. After the experiment pipeline is complete, 2--3 Fuel models can be placed in each corridor as static clutter for more realistic paper screenshots and additional SLAM features. This is cosmetic, not scientific --- the controlled geometric corridors are \emph{better} for a controls paper because confounding variables are minimized.
+\end{itemize}
+
 \end{document}
