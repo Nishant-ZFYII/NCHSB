@@ -411,11 +411,17 @@ Social Costmap Plugins (Phase 5) & \textcolor{fixgreen}{Done (ahead)} & Both \te
 \hline
 CBF Safety Shield (Phase 5) & \textcolor{fixgreen}{Completed} & Proper CBF/QP formulation with braking-distance enhanced barrier, directional + velocity-aware constraints, analytical QP solver. 27/27 unit tests pass. ROS node publishes \texttt{/cmd\_vel\_safe}, \texttt{/cbf/min\_barrier}, \texttt{/cbf/intervention}. \\
 \hline
-Scenario System (Phase 6) & \textcolor{issuered}{Pending} & No scenario YAMLs or loader. \texttt{gt\_collision\_detector.py} and \texttt{goal\_sender.py} are placeholders only. \\
+Scenario System (Phase 6) & \textcolor{fixgreen}{Completed} & 6 scenario YAMLs. \texttt{scenario\_loader.py} (seed-based deterministic randomization). \texttt{pedestrian\_driver.py} (Gazebo set\_pose). \texttt{gt\_collision\_detector.py} and \texttt{goal\_sender.py} fully implemented --- table was stale. 17 unit tests pass. \\
 \hline
-Experiment Runner (Phase 6) & \textcolor{issuered}{Pending} & No \texttt{run\_experiment.py}, \texttt{run\_all\_experiments.sh}, or \texttt{sim\_experiment.launch.py}. \\
+Experiment Runner (Phase 6) & \textcolor{fixgreen}{Completed} & \texttt{run\_experiment.py}, \texttt{run\_all\_experiments.sh}, \texttt{sim\_experiment.launch.py} implemented. \texttt{metrics\_logger.py} fully implemented (was placeholder). 31 metrics unit tests pass. \\
 \hline
-Metrics/Analysis (Phase 7) & \textcolor{issuered}{Pending} & \texttt{metrics\_logger.py} placeholder only. No \texttt{analyze\_results.py} or \texttt{plot\_results.py}. \\
+Nav2 Configs (Phase 4, caught in 6) & \textcolor{fixgreen}{Caught \& Fixed} & All 4 config files were 0-byte empties --- Phase 4 was marked complete prematurely. Fully populated with low-speed corridor MPPI params during Phase 6. \\
+\hline
+SLAM Maps & \textcolor{issuered}{Pending (next)} & Not yet generated for any of the 6 worlds. Requires: launch world + SLAM Toolbox + drive + \texttt{map\_saver\_cli}. Blocks all experiments. \\
+\hline
+Smoke Test (pre-batch) & \textcolor{issuered}{Pending (next)} & Run one trial end-to-end before 1,710-trial batch. See next steps below. \\
+\hline
+Metrics/Analysis (Phase 7) & \textcolor{issuered}{Pending} & \texttt{analyze\_results.py} and \texttt{plot\_results.py} not built. Develop in parallel while batch runs overnight. \\
 \hline
 \end{tabular}
 \end{center}
@@ -630,6 +636,75 @@ MODIFIED:
   corridor_social_nav_bringup/setup.py  (added pedestrian_driver entry point)
   corridor_social_nav_bringup/package.xml  (added ros_gz_interfaces dep)
 \end{verbatim}
+
+%% ═══════════════════════════════════════════════════════════════════
+%%  STATUS TABLE CORRECTION NOTE
+%% ═══════════════════════════════════════════════════════════════════
+
+\logentry{2026-03-05 -- Status Table Correction and Next Session To-Dos}
+
+\begin{itemize}
+  \item \issue{Status table (Phase 6 row) was stale.} The ``Scenario System'' row said
+    \texttt{gt\_collision\_detector.py} and \texttt{goal\_sender.py} were ``placeholders
+    only'' --- contradicting the Phase 3 log entry (which documented their full
+    implementation) and the Phase 6 narrative. The table was not updated after Phase 3
+    completion. \fix{Corrected: both nodes are fully implemented. Table now reflects
+    actual state.}
+
+  \item \issue{Phase 4 Nav2 configs marked complete but were 0-byte files.}
+    The four controller YAML files were written as empty files during Phase 4 and the
+    plan item was marked complete prematurely. Caught and fixed during Phase 6.
+    \note{Lesson: before marking a plan item complete, verify file size or grep for
+    required keywords. Moving fast is good; skipping verification before 1,710 trials
+    is not.}
+
+  \item \textbf{User note (verbatim, 2026-03-05)}: ``This is ahead of where the 26-week
+    plan expected you to be. Phase 7 (analysis scripts) can be built while the batch
+    runs overnight.''
+\end{itemize}
+
+\subsection*{Next Session: Ordered To-Do List}
+
+\begin{enumerate}
+  \item \textbf{[BLOCKER] Generate SLAM maps for all 6 corridor worlds.}
+    Nav2 localization (AMCL) requires pre-built occupancy grid maps. Without them,
+    no trials can run.
+    \begin{verbatim}
+# For each world (straight, lturn, tjunction, narrow, doorway, loop):
+ros2 launch rc_model_description fortress_bringup.launch.py world:=<world>.sdf ...
+ros2 launch slam_toolbox online_async_launch.py use_sim_time:=true
+# Drive robot through full corridor (teleop or auto-explorer script)
+ros2 run nav2_map_server map_saver_cli -f maps/<world>
+    \end{verbatim}
+
+  \item \textbf{[CRITICAL] Single end-to-end smoke test before batch.}
+    Run one trial of \texttt{head\_on\_single} with the \texttt{full} controller,
+    seed 0. Manually verify:
+    \begin{itemize}
+      \item All topics publishing: \texttt{/tracked\_people}, \texttt{/min\_human\_distance},
+        \texttt{/collision\_event}, \texttt{/gt\_ttc}, \texttt{/cbf/intervention},
+        \texttt{/cmd\_vel\_safe}, \texttt{/trial\_result}
+      \item \texttt{metrics\_logger} writes a valid CSV with all 10 columns
+      \item Pedestrian spawns and moves along its waypoints
+      \item Nav2 sends the robot to the goal (or times out gracefully)
+    \end{itemize}
+    \textbf{Do not launch the batch until this passes.} One bad trial is cheap; 1,710
+    bad trials is 85 hours of useless data.
+
+  \item \textbf{[PARALLEL] Build Phase 7 analysis scripts} while batch runs overnight.
+    \begin{itemize}
+      \item \texttt{analyze\_results.py}: read all trial CSVs, aggregate per condition
+        (mean, std, median), Wilcoxon signed-rank (continuous metrics),
+        Fisher's exact test (collision rate, success rate), generate LaTeX tables.
+      \item \texttt{plot\_results.py}: box plots per scenario per metric, bar charts
+        across controllers, ablation sweep plots, shield intervention timeline.
+    \end{itemize}
+
+  \item \textbf{[OPTIONAL] Write unit tests for corridor\_frame.cpp.}
+    The Frenet projection math is non-trivial and currently has no unit tests
+    (flagged in the Phase 5 status row). Test: on-path point gives $d=0$,
+    off-path offset gives correct sign/magnitude, velocity projection is correct.
+\end{enumerate}
 
 \section*{Future Work / Nice-to-Haves}
 \begin{itemize}
