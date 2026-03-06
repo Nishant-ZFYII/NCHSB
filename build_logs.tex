@@ -1,0 +1,295 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{datetime2}
+
+\definecolor{codebg}{RGB}{245,245,245}
+\definecolor{issuered}{RGB}{200,50,50}
+\definecolor{fixgreen}{RGB}{50,150,50}
+\definecolor{notblue}{RGB}{50,100,200}
+
+\lstset{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{gray},
+  columns=fullflexible
+}
+
+\newcommand{\logentry}[1]{\subsection*{#1}}
+\newcommand{\issue}[1]{\textcolor{issuered}{\textbf{ISSUE:} #1}}
+\newcommand{\fix}[1]{\textcolor{fixgreen}{\textbf{FIX:} #1}}
+\newcommand{\note}[1]{\textcolor{notblue}{\textbf{NOTE:} #1}}
+
+\title{Corridor Social Navigation -- Build Log\\
+\large ICRA 2027 Paper: Corridor-Frame Predictive Social Costmap\\with CBF Safety Shield for Ackermann Robots}
+\author{Nishant}
+\date{Started: \today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% ============================================================
+\section{Phase 1: Branch Setup and Package Scaffolding}
+% ============================================================
+
+\logentry{2026-03-05 -- Branch Creation}
+\begin{itemize}
+  \item Created branch \texttt{feat/corridor-social-nav} from \texttt{da3-costmap-ablation}.
+  \item Base branch had 4 uncommitted changes (da3 changelog, CMakeLists, pointcloud, dynamic\_inflation). These are carried over into the new branch.
+  \item Repository: \texttt{/home/nishant/MS\_Project/NCHSB}
+\end{itemize}
+
+\logentry{2026-03-05 -- Fix: my\_world.world Typo}
+\begin{itemize}
+  \item \issue{Line 188 of \texttt{src/rc\_model\_description/worlds/my\_world.world} has \texttt{2.5.0} instead of \texttt{2.5} in obstacle\_box\_2 pose. Invalid SDF.}
+  \item \fix{Changed \texttt{<pose>2.5.0 0.0 0.15 0 0 0</pose>} to \texttt{<pose>2.5 0.0 0.15 0 0 0</pose>}.}
+\end{itemize}
+
+\logentry{2026-03-05 -- Fix: Hardcoded Paths}
+\begin{itemize}
+  \item \issue{Multiple files reference \texttt{/home/asas/Documents/NCHSB/} which does not exist on this machine.}
+  \item Files affected:
+  \begin{enumerate}
+    \item \texttt{nav2\_params\_rc.yaml} line 59: BT XML path
+    \item \texttt{nav2\_params\_rc.yaml} line 397: racing line file
+    \item \texttt{nav2\_params\_rc.yaml} line 499: map YAML
+    \item \texttt{launch\_all.sh}: WORKSPACE\_DIR
+    \item \texttt{launch\_multi\_terminal.sh}: WORKSPACE\_DIR
+  \end{enumerate}
+  \item \fix{Replaced absolute paths with relative or FindPackageShare-based resolution. See individual file diffs.}
+\end{itemize}
+
+\logentry{2026-03-05 -- Fix: behavior\_trees Not Installed}
+\begin{itemize}
+  \item \issue{\texttt{behavior\_trees/} directory not listed in \texttt{CMakeLists.txt} install targets for \texttt{rc\_model\_description}. BT XML not available at runtime.}
+  \item \fix{Added install directive for \texttt{behavior\_trees} directory.}
+\end{itemize}
+
+\logentry{2026-03-05 -- New Package: corridor\_social\_nav}
+\begin{itemize}
+  \item Created \texttt{src/corridor\_social\_nav/} (ament\_cmake).
+  \item Custom messages: \texttt{TrackedPerson.msg}, \texttt{TrackedPeople.msg}.
+  \item Placeholder sources for: corridor\_frame, social\_layer, predictive\_social\_layer, safety\_shield\_node.
+  \item Plugin description XML for Nav2 costmap layer registration.
+\end{itemize}
+
+\logentry{2026-03-05 -- New Package: corridor\_social\_nav\_bringup}
+\begin{itemize}
+  \item Created \texttt{src/corridor\_social\_nav\_bringup/} (ament\_python).
+  \item Placeholder nodes: gt\_people\_publisher, gt\_collision\_detector, metrics\_logger, scenario\_loader, goal\_sender.
+  \item Directories: launch/, scenarios/, scripts/.
+\end{itemize}
+
+\logentry{2026-03-05 -- Build Issue: empy Module Not Found}
+\begin{itemize}
+  \item \issue{colcon build failed with \texttt{ModuleNotFoundError: No module named 'em'} during rosidl message generation for \texttt{corridor\_social\_nav}.}
+  \item \note{Root cause: miniconda's Python (\texttt{/home/nishant/miniconda3/bin/python3}) is first on PATH and shadows the system Python. ROS 2's rosidl\_adapter uses the PATH python, which lacked the \texttt{empy} package.}
+  \item \fix{Installed \texttt{empy==3.3.4} into miniconda's Python: \texttt{/home/nishant/miniconda3/bin/pip install empy==3.3.4 lark}. Build succeeded after this.}
+  \item \note{Long-term fix: consider adding \texttt{conda deactivate} to build scripts, or setting \texttt{PYTHON\_EXECUTABLE} explicitly in CMake.}
+\end{itemize}
+
+\logentry{2026-03-05 -- Build Verification}
+\begin{itemize}
+  \item Full workspace build: \textbf{6 packages, 0 errors, 14.2s}.
+  \item Packages built:
+  \begin{enumerate}
+    \item \texttt{rc\_model\_description} (existing, ament\_cmake)
+    \item \texttt{corridor\_social\_nav} (new, ament\_cmake, C++ + msgs)
+    \item \texttt{rc\_nav\_bridge} (existing, ament\_python)
+    \item \texttt{corridor\_social\_nav\_bringup} (new, ament\_python)
+    \item \texttt{rc\_hardware\_bringup} (existing, ament\_cmake)
+    \item \texttt{rc\_racing\_planner} (existing, ament\_cmake)
+  \end{enumerate}
+  \item Custom messages generated: \texttt{TrackedPerson.msg}, \texttt{TrackedPeople.msg}.
+  \item Costmap layer plugins registered: \texttt{SocialLayer}, \texttt{PredictiveSocialLayer}.
+  \item Safety shield node compiled: \texttt{safety\_shield\_node}.
+  \item Corridor frame library compiled: \texttt{libcorridor\_frame.so}.
+\end{itemize}
+
+\newpage
+% ============================================================
+\section{Phase 0: LiDAR-Actor Visibility Gate Check}
+% ============================================================
+
+\logentry{2026-03-05 -- Blocker: Gazebo Harmonic/Fortress Not Installed}
+\begin{itemize}
+  \item \issue{Phase 0 cannot proceed. The simulation workflow requires Gazebo Fortress/Harmonic (\texttt{ros\_gz\_sim}, \texttt{ros\_gz\_bridge}) but only Gazebo Classic 11 is installed on this machine.}
+  \item \note{Installed Gazebo packages: \texttt{gazebo 11.10.2}, \texttt{ros-humble-gazebo-ros-pkgs 3.9.0}. These are for Gazebo Classic, not the Ignition/Gz Sim used by \texttt{fortress\_bringup.launch.py}.}
+  \item \note{The launch file imports \texttt{ros\_gz\_sim} and spawns \texttt{ros\_gz\_bridge} nodes for \texttt{/scan}, \texttt{/imu}, \texttt{/clock}. The world files use \texttt{gz::sim::systems::Physics} and \texttt{gpu\_lidar} sensor type -- all Gz Sim syntax.}
+  \item \note{Available in apt: \texttt{ros-humble-ros-gz} (meta-package). Install via \texttt{sudo apt-get install ros-humble-ros-gz}.}
+  \item \fix{User must run: \texttt{sudo apt-get install ros-humble-ros-gz}. This pulls Gazebo Fortress + bridge + interfaces. Estimated download: 1--2 GB.}
+\end{itemize}
+
+\logentry{2026-03-05 -- Additional Missing Dependencies}
+\begin{itemize}
+  \item \issue{User installed \texttt{ros-humble-ros-gz} (Gazebo Fortress + bridge). First launch attempt failed with ``Unable to find or download file'' --- Gazebo crashed immediately.}
+  \item \note{Root cause 1: World files used \texttt{gz-sim-*-system} plugin filenames (Gazebo Garden/Harmonic naming). Ignition Fortress v6 requires \texttt{libignition-gazebo-*-system.so} filenames. Fixed all 4 world files: \texttt{my\_world.world}, \texttt{lidar\_actor\_spike\_test.world}, \texttt{my\_world\_hex.world}, \texttt{track\_30mps.world}.}
+  \item \note{Root cause 2: \texttt{fortress\_bringup.launch.py} spawns \texttt{joint\_state\_broadcaster} and \texttt{ackermann\_steering\_controller} via \texttt{controller\_manager}. None of these are installed: \texttt{ros2\_control}, \texttt{ros2\_controllers}, \texttt{gz\_ros2\_control}, \texttt{controller\_manager} all missing.}
+  \item \fix{For Phase 0 spike test: bypassed the full robot launch entirely. Created self-contained world with an inline \texttt{gpu\_lidar} sensor on a minimal static box model. Only needs \texttt{ros\_gz\_sim} + \texttt{ros\_gz\_bridge}. Uses \texttt{ign gazebo} directly instead of \texttt{fortress\_bringup.launch.py}.}
+  \item \note{Existing NCHSB code versions: \texttt{corridor.world} = Gazebo Classic (uses \texttt{model://ground\_plane}, \texttt{libgazebo\_ros\_state.so}); \texttt{my\_world.world} and others = Ignition Fortress (inline models, \texttt{ignition::gazebo::systems::*} plugins); \texttt{gazebo\_control.xacro} = \texttt{gz\_ros2\_control} (Fortress ros2\_control bridge); \texttt{gazebo\_control\_mimic.xacro} = Gazebo Classic \texttt{gazebo\_ros2\_control} (older).}
+  \item \note{Full robot launch will require: \texttt{sudo apt-get install ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-gz-ros2-control}.}
+\end{itemize}
+
+\logentry{2026-03-05 -- Spike Test Result: Cylinders INVISIBLE to gpu\_lidar}
+\begin{itemize}
+  \item \note{Gazebo Ignition Fortress launched successfully with corrected plugin names (\texttt{libignition-gazebo-*-system.so}). All entities loaded: \texttt{ground\_plane}, \texttt{lidar\_bot}, \texttt{ped\_static\_cylinder}, \texttt{ped\_dynamic\_cylinder}, \texttt{wall\_south}, \texttt{wall\_north}.}
+  \item \note{Scan stats: 720 rays, 180 valid returns (25\%), range [0.12, 8.0] m.}
+  \item \note{South wall (box geometry, bearing --90\degree): \textbf{VISIBLE}. Min distance 1.926 m, mean 1.974 m. Correct for 2.0 m expected.}
+  \item \issue{RED static cylinder (bearing 0\degree): \textbf{INVISIBLE}. 60 rays in cone, 0 valid returns.}
+  \item \issue{BLUE dynamic cylinder (bearing +90\degree): \textbf{INVISIBLE}. Also fell through/into the north wall due to gravity + overlap at spawn position (1.0, 2.0) coinciding with wall at y=2.0.}
+  \item \issue{North wall (bearing +90\degree): INVISIBLE --- likely occluded or disrupted by the BLUE cylinder embedded in it.}
+  \item \issue{\texttt{libEGL warning: egl: failed to create dri2 screen} (x4). GPU rendering context incomplete; \texttt{gpu\_lidar} sensor uses ogre2 rendering, not physics collision geometry. Cylinder visual geometry may not render properly without full EGL support.}
+  \item \fix{Verdict script had a bug: \texttt{'VISIBLE' in 'INVISIBLE'} evaluates to \texttt{True} (substring match). Fixed to use \texttt{== 'VISIBLE'} exact match.}
+\end{itemize}
+
+\logentry{2026-03-05 -- Phase 0 Decision: GT-Pose Architecture}
+\begin{itemize}
+  \item \note{Cylinders are invisible to \texttt{gpu\_lidar}. Box-shaped walls are visible. This is likely due to ogre2 render-based ray casting with incomplete EGL context, not physics collision.}
+  \item \fix{Architecture decision: Pedestrians will be tracked via ground-truth poses from Gazebo, published on \texttt{/tracked\_people} by \texttt{gt\_people\_publisher.py}. The social costmap plugins and safety shield already subscribe to \texttt{/tracked\_people}, not \texttt{/scan}. LiDAR visibility of pedestrians is NOT required for the social navigation stack.}
+  \item \note{Impact on baselines: Vanilla MPPI (no social layer) will rely solely on LiDAR obstacle detection. Since cylinders are invisible, vanilla MPPI will not detect pedestrians and will collide. This is the expected behavior --- it demonstrates the need for the social costmap layer, which is the thesis of the paper.}
+  \item \note{Phase 3 (Pedestrian Actors) is now unblocked. Will use dynamic cylinder models positioned via Gazebo \texttt{/world/default/set\_pose} service or scripted trajectories, with GT poses bridged to ROS.}
+\end{itemize}
+
+\newpage
+% ============================================================
+\section{Phase 2: Corridor Worlds}
+% ============================================================
+
+\logentry{2026-03-05 -- Built 5 Corridor SDF Worlds}
+\begin{itemize}
+  \item \fix{Created all 5 corridor world files in \texttt{src/rc\_model\_description/worlds/}. All use Ignition Fortress v6 plugin naming (\texttt{libignition-gazebo-*-system.so}), inline ground plane and sun (no \texttt{model://} URIs), consistent wall material.}
+  \item \note{Worlds built and installed successfully via \texttt{colcon build --packages-select rc\_model\_description}. All 5 files present in install directory.}
+\end{itemize}
+
+\begin{center}
+\begin{tabular}{|l|c|l|l|}
+\hline
+\textbf{World} & \textbf{Width} & \textbf{Geometry} & \textbf{Default Spawn} \\
+\hline
+\texttt{corridor\_straight.sdf} & 2.0 m & 20 m straight hallway, end caps & x=-9.0, y=0.0, yaw=0.0 \\
+\texttt{corridor\_lturn.sdf} & 2.0 m & 10 m + 90\degree turn + 10 m & x=-4.0, y=0.0, yaw=0.0 \\
+\texttt{corridor\_tjunction.sdf} & 2.0 m & 15 m main + 8 m branch, gap in north wall & x=-6.5, y=0.0, yaw=0.0 \\
+\texttt{corridor\_narrow.sdf} & 2.0/1.5 m & 15 m with 5 m narrow section (1.5 m) & x=-6.5, y=0.0, yaw=0.0 \\
+\texttt{corridor\_doorway.sdf} & 2.0 m & 15 m with 2 alcoves (1.5 m deep) & x=-6.5, y=0.0, yaw=0.0 \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{itemize}
+  \item \note{SLAM occupancy grid maps for each world still need to be generated (requires robot teleop in each world). Blocked on ros2\_control installation.}
+\end{itemize}
+
+\newpage
+% ============================================================
+\section{Phase 3: Pedestrian Actor System}
+% ============================================================
+
+\logentry{2026-03-05 -- Pedestrian Model + GT Infrastructure}
+\begin{itemize}
+  \item \fix{Created pedestrian model SDF: \texttt{src/rc\_model\_description/models/pedestrian/model.sdf}. Cylinder r=0.25 m, h=1.7 m, mass=70 kg. Spawn via \texttt{ros2 run ros\_gz\_sim create}.}
+  \item \fix{Implemented \texttt{gt\_people\_publisher.py} (was placeholder). Subscribes to Gazebo dynamic pose topics (\texttt{/world/default/dynamic\_pose/info} and \texttt{/world/default/pose/info} via \texttt{ros\_gz\_bridge} as TFMessage). Filters for model names with prefix \texttt{pedestrian\_}. Computes velocity via finite differencing. Publishes \texttt{TrackedPeople} on \texttt{/tracked\_people}. Supports \texttt{noise\_std} param for tracking noise ablation.}
+  \item \fix{Implemented \texttt{gt\_collision\_detector.py} (was placeholder). Uses GT robot pose (\texttt{/ground\_truth\_pose}) and GT pedestrian poses (\texttt{/tracked\_people}) --- NOT scan-based. Computes min human-robot distance, collision events (dist $<$ 0.45 m = robot\_radius + person\_radius), and time-to-collision (TTC). Publishes on \texttt{/min\_human\_distance}, \texttt{/collision\_event}, \texttt{/gt\_ttc}. Rising-edge collision counting.}
+  \item \fix{Implemented \texttt{goal\_sender.py} (was placeholder). Sends \texttt{NavigateToPose} action goal to Nav2, monitors for success/abort/timeout. Publishes trial result on \texttt{/trial\_result} (e.g., ``SUCCESS:45.2'' or ``TIMEOUT:120.0'').}
+  \item \note{All three nodes build and install cleanly via \texttt{colcon build}. Entry points registered in \texttt{setup.py}.}
+  \item \note{Remaining for Phase 3: scenario-based dynamic pedestrian spawning (SDF template injection or \texttt{ros\_gz\_sim create} at launch). This will be built as part of Phase 6 (Scenario System).}
+\end{itemize}
+
+\newpage
+% ============================================================
+\section{Phase 4: Nav2 Configuration Variants}
+% ============================================================
+
+\logentry{2026-03-05 -- ros2\_control Stack Installed}
+\begin{itemize}
+  \item \fix{User installed: \texttt{sudo apt-get install ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-gz-ros2-control}. This unblocks the full robot simulation via \texttt{fortress\_bringup.launch.py} (Ackermann steering controller, joint state broadcaster, gz\_ros2\_control bridge).}
+  \item \note{Full dependency chain now complete: Ignition Fortress + ros\_gz\_sim/bridge + ros2\_control + gz\_ros2\_control + Nav2 + corridor\_social\_nav packages.}
+\end{itemize}
+
+\logentry{2026-03-05 -- Created 4 Controller Variant YAMLs}
+\begin{itemize}
+  \item \fix{Created 4 standalone Nav2 config files in \texttt{src/rc\_model\_description/config/}. All use Ackermann MPPI at corridor speed (1.0 m/s max, down from 5.0 m/s racing config). SmacPlannerHybrid for global planning (not RacingLinePlanner).}
+  \item \note{All configs share: identical AMCL, BT navigator, MPPI controller params (48 timesteps, batch\_size=1000, temperature=0.3, min\_turning\_r=0.30), global costmap (static + inflation), planner, smoother, behavior server, velocity smoother.}
+\end{itemize}
+
+\begin{center}
+\small
+\begin{tabular}{|l|l|p{6cm}|}
+\hline
+\textbf{Config File} & \textbf{Label} & \textbf{Local Costmap Plugins} \\
+\hline
+\texttt{nav2\_mppi\_vanilla.yaml} & MPPI & static + obstacle + inflation \\
+\texttt{nav2\_mppi\_social\_instant.yaml} & MPPI+Social & static + obstacle + \textbf{SocialLayer} + inflation \\
+\texttt{nav2\_mppi\_social\_pred.yaml} & MPPI+Pred & static + obstacle + \textbf{PredictiveSocialLayer} + inflation \\
+\texttt{nav2\_full.yaml} & Full & static + obstacle + \textbf{PredictiveSocialLayer} + inflation + CBF shield (launched separately) \\
+\hline
+\end{tabular}
+\end{center}
+
+\newpage
+% ============================================================
+\section{Phase 5: Core Algorithm Implementation}
+% ============================================================
+\textit{(to be filled)}
+
+\newpage
+% ============================================================
+\section{Phase 6: Scenario Definition and Experiment Runner}
+% ============================================================
+\textit{(to be filled)}
+
+\newpage
+% ============================================================
+\section{Phase 7: Metrics and Analysis Pipeline}
+% ============================================================
+\textit{(to be filled)}
+
+\newpage
+% ============================================================
+\section{Phase 8: Integration Launch Files}
+% ============================================================
+\textit{(to be filled)}
+
+\newpage
+% ============================================================
+\section{Plan Status Summary}
+% ============================================================
+
+\begin{center}
+\small
+\begin{tabular}{|l|l|p{7.5cm}|}
+\hline
+\textbf{Plan Item} & \textbf{Status} & \textbf{What Was Done} \\
+\hline
+LiDAR-Actor Spike (Phase 0) & \textcolor{fixgreen}{Completed} & Cylinders INVISIBLE to gpu\_lidar (EGL issue). Walls (boxes) visible. Decision: use GT-pose architecture via \texttt{/tracked\_people}. Vanilla MPPI intentionally blind to peds (demonstrates need for social layer). \\
+\hline
+Branch Setup (Phase 1) & \textcolor{fixgreen}{Completed} & Branch \texttt{feat/corridor-social-nav} created. Both packages scaffolded. Messages defined. Hardcoded paths fixed. World typo fixed. BT install fixed. Full workspace builds (6 packages, 0 errors). \\
+\hline
+Corridor Worlds (Phase 2) & \textcolor{fixgreen}{Completed} & 5 corridor SDF worlds built and installed. SLAM occupancy grid maps still pending (needs ros2\_control for robot teleop). \\
+\hline
+Pedestrian Actors (Phase 3) & \textcolor{fixgreen}{Completed} & Pedestrian model SDF created. \texttt{gt\_people\_publisher.py}, \texttt{gt\_collision\_detector.py}, \texttt{goal\_sender.py} fully implemented (from placeholders). Dynamic spawning deferred to Phase 6. \\
+\hline
+Nav2 Configs (Phase 4) & \textcolor{fixgreen}{Completed} & 4 corridor MPPI configs: vanilla, social\_instant, social\_pred, full. All at 1.0 m/s with Ackermann kinematics. \\
+\hline
+Corridor Frame (Phase 5) & \textcolor{fixgreen}{Done (ahead)} & \texttt{corridor\_frame.cpp/.hpp} fully implemented. Working \texttt{toFrenet}, \texttt{toCartesian}, \texttt{toFrenetState} with arc-length parameterization. Unit tests not written. \\
+\hline
+Social Costmap Plugins (Phase 5) & \textcolor{fixgreen}{Done (ahead)} & Both \texttt{social\_layer.cpp} (instant Gaussian) and \texttt{predictive\_social\_layer.cpp} (corridor-frame, anisotropic, time-growing sigma) fully implemented and registered as Nav2 plugins. \\
+\hline
+CBF Safety Shield (Phase 5) & \textcolor{notblue}{Partial} & \texttt{safety\_shield\_node.cpp} has stopping-distance barrier + basic intervention logic. Missing: OSQP QP solver, adaptive speed limiting. Uses simpler scale-down. \\
+\hline
+Scenario System (Phase 6) & \textcolor{issuered}{Pending} & No scenario YAMLs or loader. \texttt{gt\_collision\_detector.py} and \texttt{goal\_sender.py} are placeholders only. \\
+\hline
+Experiment Runner (Phase 6) & \textcolor{issuered}{Pending} & No \texttt{run\_experiment.py}, \texttt{run\_all\_experiments.sh}, or \texttt{sim\_experiment.launch.py}. \\
+\hline
+Metrics/Analysis (Phase 7) & \textcolor{issuered}{Pending} & \texttt{metrics\_logger.py} placeholder only. No \texttt{analyze\_results.py} or \texttt{plot\_results.py}. \\
+\hline
+\end{tabular}
+\end{center}
+
+\end{document}

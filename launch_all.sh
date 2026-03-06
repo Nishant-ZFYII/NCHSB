@@ -14,7 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-WORKSPACE_DIR="/home/asas/Documents/NCHSB"
+WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORLD_NAME="default"  # Must match the world name in your .world file
 
 # Function to print colored messages

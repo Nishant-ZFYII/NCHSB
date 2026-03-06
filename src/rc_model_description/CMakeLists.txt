@@ -4,7 +4,7 @@ project(rc_model_description)
 find_package(ament_cmake REQUIRED)
 
 # Install the model files so "package://rc_model_description/..." resolves
-install(DIRECTORY urdf meshes launch rviz config worlds models maps
+install(DIRECTORY urdf meshes launch rviz config worlds models maps behavior_trees
   DESTINATION share/${PROJECT_NAME}
 )
 

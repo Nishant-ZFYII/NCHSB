@@ -1,0 +1,19 @@
+<library path="social_layer">
+  <class type="corridor_social_nav::SocialLayer"
+         base_class_type="nav2_costmap_2d::Layer">
+    <description>
+      Instantaneous social costmap layer: stamps isotropic Gaussian risk
+      at each tracked person's current position.
+    </description>
+  </class>
+</library>
+<library path="predictive_social_layer">
+  <class type="corridor_social_nav::PredictiveSocialLayer"
+         base_class_type="nav2_costmap_2d::Layer">
+    <description>
+      Corridor-frame predictive social costmap layer: stamps anisotropic
+      Gaussian risk tubes along predicted person trajectories in Frenet
+      coordinates with time-growing uncertainty.
+    </description>
+  </class>
+</library>

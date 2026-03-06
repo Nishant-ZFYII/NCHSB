@@ -1,0 +1,51 @@
+<?xml version="1.0" ?>
+<!--
+  Pedestrian proxy model for corridor social navigation experiments.
+  Cylinder r=0.25m, h=1.7m (~human torso cross-section).
+
+  NOTE: gpu_lidar does NOT detect this model (Phase 0 finding).
+  Pedestrians are tracked via GT poses from Gazebo, published on
+  /tracked_people by gt_people_publisher.py.
+
+  Spawn dynamically via:
+    ros2 run ros_gz_sim create -world default \
+      -file path/to/model.sdf -name pedestrian_1 -x 5 -y 0 -z 0.85
+-->
+<sdf version="1.6">
+  <model name="pedestrian">
+    <static>false</static>
+    <link name="link">
+      <inertial>
+        <mass>70.0</mass>
+        <inertia>
+          <ixx>17.0</ixx>
+          <iyy>17.0</iyy>
+          <izz>1.1</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="collision">
+        <geometry>
+          <cylinder>
+            <radius>0.25</radius>
+            <length>1.7</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="visual">
+        <geometry>
+          <cylinder>
+            <radius>0.25</radius>
+            <length>1.7</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.8 0.4 0.1 1</ambient>
+          <diffuse>0.9 0.5 0.2 1</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

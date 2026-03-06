@@ -1,0 +1,199 @@
+<?xml version="1.0" ?>
+<!--
+  Phase 0 Gate Check: LiDAR-Actor Visibility Spike Test
+
+  Self-contained world with an embedded LiDAR sensor on a minimal "robot"
+  model. No ros2_control, no xacro, no external dependencies beyond
+  ros_gz_sim and ros_gz_bridge.
+
+  Test objects:
+    - RED static cylinder at (3.0, 0.0)  -- 2m ahead of robot
+    - BLUE dynamic cylinder at (1.0, 2.0) -- 2m to the left
+    - Corridor walls for reference
+
+  Launch:
+    ros2 launch ros_gz_sim gz_sim.launch.py \
+      gz_args:="path/to/lidar_actor_spike_test.world"
+  Bridge:
+    ros2 run ros_gz_bridge parameter_bridge \
+      /scan@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan
+-->
+<sdf version="1.6">
+  <world name="default">
+
+    <!-- Ground plane (inline, no model:// URI) -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Sun (inline) -->
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <direction>-0.5 0.5 -1</direction>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+    </light>
+
+    <!-- =================================================================
+         MINIMAL ROBOT: just a box with a gpu_lidar sensor
+         Placed at origin (1.0, 0.0, 0.15), facing +X
+         ================================================================= -->
+    <model name="lidar_bot">
+      <static>true</static>
+      <pose>1.0 0.0 0.15 0 0 0</pose>
+      <link name="base_link">
+        <visual name="body_vis">
+          <geometry><box><size>0.3 0.2 0.1</size></box></geometry>
+          <material><ambient>0.1 0.6 0.1 1</ambient><diffuse>0.2 0.8 0.2 1</diffuse></material>
+        </visual>
+        <collision name="body_col">
+          <geometry><box><size>0.3 0.2 0.1</size></box></geometry>
+        </collision>
+
+        <!-- GPU LiDAR sensor matching the real robot config -->
+        <sensor name="lidar" type="gpu_lidar">
+          <pose>0 0 0.05 0 0 0</pose>
+          <topic>scan</topic>
+          <update_rate>10</update_rate>
+          <always_on>true</always_on>
+          <visualize>true</visualize>
+          <lidar>
+            <scan>
+              <horizontal>
+                <samples>720</samples>
+                <resolution>1</resolution>
+                <min_angle>-3.14159</min_angle>
+                <max_angle>3.14159</max_angle>
+              </horizontal>
+              <vertical>
+                <samples>1</samples>
+                <resolution>1</resolution>
+                <min_angle>0</min_angle>
+                <max_angle>0</max_angle>
+              </vertical>
+            </scan>
+            <range>
+              <min>0.12</min>
+              <max>8.0</max>
+              <resolution>0.01</resolution>
+            </range>
+            <noise>
+              <type>gaussian</type>
+              <mean>0.0</mean>
+              <stddev>0.01</stddev>
+            </noise>
+          </lidar>
+        </sensor>
+      </link>
+    </model>
+
+    <!-- =================================================================
+         TEST 1: Static cylinder (RED) -- pedestrian proxy
+         Position: 2m ahead of robot at (3.0, 0.0)
+         ================================================================= -->
+    <model name="ped_static_cylinder">
+      <static>true</static>
+      <pose>3.0 0.0 0.85 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder><radius>0.25</radius><length>1.7</length></cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder><radius>0.25</radius><length>1.7</length></cylinder>
+          </geometry>
+          <material><ambient>0.8 0.2 0.2 1</ambient><diffuse>0.9 0.3 0.3 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- =================================================================
+         TEST 2: Dynamic (non-static) cylinder (BLUE) with inertia
+         Position: 2m to the left at (1.0, 2.0)
+         ================================================================= -->
+    <model name="ped_dynamic_cylinder">
+      <static>false</static>
+      <pose>1.0 2.0 0.85 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>70.0</mass>
+          <inertia>
+            <ixx>17.0</ixx><iyy>17.0</iyy><izz>1.1</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <cylinder><radius>0.25</radius><length>1.7</length></cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder><radius>0.25</radius><length>1.7</length></cylinder>
+          </geometry>
+          <material><ambient>0.2 0.2 0.8 1</ambient><diffuse>0.3 0.3 0.9 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- =================================================================
+         Reference walls (simple corridor segment)
+         ================================================================= -->
+    <model name="wall_south">
+      <static>true</static>
+      <pose>3 -2 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>10.0 0.1 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>10.0 0.1 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_north">
+      <static>true</static>
+      <pose>3 2 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>10.0 0.1 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>10.0 0.1 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- =================================================================
+         Ignition Fortress (v6) system plugins
+         ================================================================= -->
+    <plugin filename="libignition-gazebo-physics-system.so"
+            name="ignition::gazebo::systems::Physics"/>
+    <plugin filename="libignition-gazebo-user-commands-system.so"
+            name="ignition::gazebo::systems::UserCommands"/>
+    <plugin filename="libignition-gazebo-scene-broadcaster-system.so"
+            name="ignition::gazebo::systems::SceneBroadcaster"/>
+    <plugin filename="libignition-gazebo-imu-system.so"
+            name="ignition::gazebo::systems::Imu"/>
+    <plugin filename="libignition-gazebo-sensors-system.so"
+            name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+  </world>
+</sdf>

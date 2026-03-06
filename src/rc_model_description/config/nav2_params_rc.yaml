@@ -56,7 +56,7 @@ bt_navigator:
     bt_loop_duration: 10
     default_server_timeout: 20
     wait_for_service_timeout: 1000
-    default_nav_to_pose_bt_xml: "/home/asas/Documents/NCHSB/src/rc_model_description/behavior_trees/navigate_to_pose_ackermann.xml"
+    default_nav_to_pose_bt_xml: ""
 
     plugin_lib_names:
       - nav2_compute_path_to_pose_action_bt_node
@@ -394,7 +394,7 @@ planner_server:
     # Racing Line Planner - serves precomputed optimal racing line
     RacingLinePlanner:
       plugin: "rc_racing_planner::RacingLinePlanner"
-      racing_line_file: "/home/asas/Documents/NCHSB/src/rc_model_description/maps/final_racing_line.yaml"
+      racing_line_file: ""
       is_closed_loop: true   # FIXED: Corridor is a closed loop circuit
 
     # Hybrid A* (backup planner - uncomment planner_plugins above to use)
@@ -496,7 +496,7 @@ velocity_smoother:
 map_server:
   ros__parameters:
     use_sim_time: True
-    yaml_filename: "/home/asas/Documents/NCHSB/src/rc_model_description/maps/20mps_corridor.yaml"
+    yaml_filename: ""
 
 map_saver:
   ros__parameters:
