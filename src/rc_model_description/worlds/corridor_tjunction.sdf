@@ -1,28 +1,12 @@
 <?xml version="1.0" ?>
 <!--
-  Gazebo Ignition Fortress (v6) T-junction corridor world.
-  
-  Geometry:
-  - Main corridor: 15m along X axis (x=-7.5 to x=+7.5), centered at y=0, width 2m
-  - Branch corridor: 8m along Y axis (y=+1.0 to y=+9.0), centered at x=0, width 2m
-  - South wall: y=-1.0, full length
-  - North wall: y=+1.0 with 2m gap (x=-1.0 to x=+1.0) for branch opening
-  - Branch walls: x=-1.0 and x=+1.0
-  - End caps at west (x=-7.5), east (x=+7.5), north (y=+9.0)
-  
-  Robot navigates along main corridor; pedestrians cross from branch.
-  Default robot spawn: x=-6.5, y=0.0, yaw=0.0
+  T-junction corridor world for Gazebo Ignition Fortress (v6).
+  Main corridor: x=-7.5 to +7.5 at y=±1. Branch: y=+1 to +9 at x=±1.
+  Wall-mounted pillars and cabinets protrude into corridor for LiDAR/SLAM scan matching.
 -->
 <sdf version="1.6">
   <world name="default">
-    <!-- Physics -->
-    <physics type="ignition">
-      <max_step_size>0.004</max_step_size>
-      <real_time_factor>1.0</real_time_factor>
-      <real_time_update_rate>250</real_time_update_rate>
-    </physics>
-
-    <!-- Plugins (Ignition Fortress v6) -->
+    <!-- Ignition Fortress (v6) plugins -->
     <plugin filename="libignition-gazebo-physics-system.so" name="ignition::gazebo::systems::Physics"/>
     <plugin filename="libignition-gazebo-user-commands-system.so" name="ignition::gazebo::systems::UserCommands"/>
     <plugin filename="libignition-gazebo-scene-broadcaster-system.so" name="ignition::gazebo::systems::SceneBroadcaster"/>
@@ -30,6 +14,15 @@
     <plugin filename="libignition-gazebo-sensors-system.so" name="ignition::gazebo::systems::Sensors">
       <render_engine>ogre2</render_engine>
     </plugin>
+
+    <!-- Directional light -->
+    <light name="sun" type="directional">
+      <pose>0 0 10 0 0.5 0</pose>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>1 1 1 1</specular>
+      <direction>-1 -1 -1</direction>
+      <cast_shadows>true</cast_shadows>
+    </light>
 
     <!-- Inline ground plane -->
     <model name="ground_plane">
@@ -67,206 +60,17 @@
       </link>
     </model>
 
-    <!-- Inline directional light -->
-    <light name="sun" type="directional">
-      <cast_shadows>true</cast_shadows>
-      <pose>0 0 10 0 0.5 0</pose>
-      <diffuse>1 1 1 1</diffuse>
-      <specular>0.5 0.5 0.5 1</specular>
-      <attenuation>
-        <range>1000</range>
-      </attenuation>
-      <direction>-0.5 -0.5 -0.9</direction>
-    </light>
-
-    <!-- Wall material -->
-    <model name="walls">
+    <!-- Main corridor: walls at y=±1, x=-7.5 to +7.5 -->
+    <!-- South wall (continuous) -->
+    <model name="wall_south">
       <static>true</static>
-
-      <!-- South wall (main corridor): y=-1.0, x=-7.5 to x=+7.5 -->
-      <link name="south_wall">
-        <pose>0 -1.0 0.25 0 0 0</pose>
+      <pose>0 -1.0 0.25 0 0 0</pose>
+      <link name="link">
         <collision name="collision">
-          <geometry>
-            <box>
-              <size>15 0.1 0.5</size>
-            </box>
-          </geometry>
+          <geometry><box><size>15 0.1 0.5</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry>
-            <box>
-              <size>15 0.1 0.5</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.3 0.3 0.3 1</ambient>
-            <diffuse>0.5 0.5 0.5 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
-        </visual>
-      </link>
-
-      <!-- North wall left segment: y=+1.0, x=-7.5 to x=-1.0 -->
-      <link name="north_wall_left">
-        <pose>-4.25 1.0 0.25 0 0 0</pose>
-        <collision name="collision">
-          <geometry>
-            <box>
-              <size>6.5 0.1 0.5</size>
-            </box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box>
-              <size>6.5 0.1 0.5</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.3 0.3 0.3 1</ambient>
-            <diffuse>0.5 0.5 0.5 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
-        </visual>
-      </link>
-
-      <!-- North wall right segment: y=+1.0, x=+1.0 to x=+7.5 -->
-      <link name="north_wall_right">
-        <pose>4.25 1.0 0.25 0 0 0</pose>
-        <collision name="collision">
-          <geometry>
-            <box>
-              <size>6.5 0.1 0.5</size>
-            </box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box>
-              <size>6.5 0.1 0.5</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.3 0.3 0.3 1</ambient>
-            <diffuse>0.5 0.5 0.5 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
-        </visual>
-      </link>
-
-      <!-- Branch west wall: x=-1.0, y=+1.0 to y=+9.0 -->
-      <link name="branch_west">
-        <pose>-1.0 5.0 0.25 0 0 0</pose>
-        <collision name="collision">
-          <geometry>
-            <box>
-              <size>0.1 8 0.5</size>
-            </box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box>
-              <size>0.1 8 0.5</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.3 0.3 0.3 1</ambient>
-            <diffuse>0.5 0.5 0.5 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
-        </visual>
-      </link>
-
-      <!-- Branch east wall: x=+1.0, y=+1.0 to y=+9.0 -->
-      <link name="branch_east">
-        <pose>1.0 5.0 0.25 0 0 0</pose>
-        <collision name="collision">
-          <geometry>
-            <box>
-              <size>0.1 8 0.5</size>
-            </box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box>
-              <size>0.1 8 0.5</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.3 0.3 0.3 1</ambient>
-            <diffuse>0.5 0.5 0.5 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
-        </visual>
-      </link>
-
-      <!-- West end cap: x=-7.5, 2.0m wide -->
-      <link name="end_cap_west">
-        <pose>-7.5 0 0.25 0 0 0</pose>
-        <collision name="collision">
-          <geometry>
-            <box>
-              <size>0.1 2.0 0.5</size>
-            </box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box>
-              <size>0.1 2.0 0.5</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.3 0.3 0.3 1</ambient>
-            <diffuse>0.5 0.5 0.5 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
-        </visual>
-      </link>
-
-      <!-- East end cap: x=+7.5, 2.0m wide -->
-      <link name="end_cap_east">
-        <pose>7.5 0 0.25 0 0 0</pose>
-        <collision name="collision">
-          <geometry>
-            <box>
-              <size>0.1 2.0 0.5</size>
-            </box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box>
-              <size>0.1 2.0 0.5</size>
-            </box>
-          </geometry>
-          <material>
-            <ambient>0.3 0.3 0.3 1</ambient>
-            <diffuse>0.5 0.5 0.5 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
-        </visual>
-      </link>
-
-      <!-- North end cap: y=+9.0, 2.0m wide -->
-      <link name="end_cap_north">
-        <pose>0 9.0 0.25 0 0 0</pose>
-        <collision name="collision">
-          <geometry>
-            <box>
-              <size>2.0 0.1 0.5</size>
-            </box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box>
-              <size>2.0 0.1 0.5</size>
-            </box>
-          </geometry>
+          <geometry><box><size>15 0.1 0.5</size></box></geometry>
           <material>
             <ambient>0.3 0.3 0.3 1</ambient>
             <diffuse>0.5 0.5 0.5 1</diffuse>
@@ -276,7 +80,451 @@
       </link>
     </model>
 
-    <!-- Default robot spawn pose (for reference; robot is spawned externally) -->
-    <!-- x=-6.5, y=0.0, yaw=0.0 -->
+    <!-- North wall left segment (x=-7.5 to -1, gap at junction) -->
+    <model name="wall_north_left">
+      <static>true</static>
+      <pose>-4.25 1.0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>6.5 0.1 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>6.5 0.1 0.5</size></box></geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.5 0.5 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- North wall right segment (x=1 to 7.5) -->
+    <model name="wall_north_right">
+      <static>true</static>
+      <pose>4.25 1.0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>6.5 0.1 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>6.5 0.1 0.5</size></box></geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.5 0.5 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- West end wall -->
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-7.5 0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.1 2.0 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 2.0 0.5</size></box></geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.5 0.5 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- East end wall -->
+    <model name="wall_east">
+      <static>true</static>
+      <pose>7.5 0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.1 2.0 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 2.0 0.5</size></box></geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.5 0.5 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Branch: walls at x=±1, y=1 to 9 -->
+    <!-- Branch east wall -->
+    <model name="wall_branch_east">
+      <static>true</static>
+      <pose>1.0 5.0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.1 8 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 8 0.5</size></box></geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.5 0.5 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Branch west wall -->
+    <model name="wall_branch_west">
+      <static>true</static>
+      <pose>-1.0 5.0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.1 8 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 8 0.5</size></box></geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.5 0.5 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Branch north end wall -->
+    <model name="wall_branch_north">
+      <static>true</static>
+      <pose>0 9 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>2.0 0.1 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>2.0 0.1 0.5</size></box></geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.5 0.5 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Wall-mounted features for LiDAR/SLAM scan matching -->
+    <!-- Main south wall (along X): offset Y by +0.075 from inner face y=-0.95 → y=-0.875 -->
+    <model name="feat_1">
+      <static>true</static>
+      <pose>-6.0 -0.875 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material>
+            <ambient>0.4 0.3 0.25 1</ambient>
+            <diffuse>0.5 0.4 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_2">
+      <static>true</static>
+      <pose>-2.8 -0.89 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <material>
+            <ambient>0.25 0.3 0.4 1</ambient>
+            <diffuse>0.35 0.4 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_3">
+      <static>true</static>
+      <pose>1.2 -0.875 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material>
+            <ambient>0.4 0.3 0.25 1</ambient>
+            <diffuse>0.5 0.4 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_4">
+      <static>true</static>
+      <pose>5.0 -0.89 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <material>
+            <ambient>0.25 0.3 0.4 1</ambient>
+            <diffuse>0.35 0.4 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- Main north wall left (along X): offset Y by -0.075 → y=0.875 -->
+    <model name="feat_5">
+      <static>true</static>
+      <pose>-6.2 0.89 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <material>
+            <ambient>0.25 0.3 0.4 1</ambient>
+            <diffuse>0.35 0.4 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_6">
+      <static>true</static>
+      <pose>-4.0 0.875 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material>
+            <ambient>0.4 0.3 0.25 1</ambient>
+            <diffuse>0.5 0.4 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_7">
+      <static>true</static>
+      <pose>-2.2 0.89 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <material>
+            <ambient>0.25 0.3 0.4 1</ambient>
+            <diffuse>0.35 0.4 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- Main north wall right (along X): y=0.875 -->
+    <model name="feat_8">
+      <static>true</static>
+      <pose>2.5 0.875 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material>
+            <ambient>0.4 0.3 0.25 1</ambient>
+            <diffuse>0.5 0.4 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_9">
+      <static>true</static>
+      <pose>4.8 0.89 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <material>
+            <ambient>0.25 0.3 0.4 1</ambient>
+            <diffuse>0.35 0.4 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_10">
+      <static>true</static>
+      <pose>6.5 0.875 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material>
+            <ambient>0.4 0.3 0.25 1</ambient>
+            <diffuse>0.5 0.4 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- Branch east wall (along Y): offset X by -0.075 → x=0.875 -->
+    <model name="feat_11">
+      <static>true</static>
+      <pose>0.875 2.5 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material>
+            <ambient>0.4 0.3 0.25 1</ambient>
+            <diffuse>0.5 0.4 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_12">
+      <static>true</static>
+      <pose>0.875 4.8 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <material>
+            <ambient>0.25 0.3 0.4 1</ambient>
+            <diffuse>0.35 0.4 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_13">
+      <static>true</static>
+      <pose>0.875 6.8 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material>
+            <ambient>0.4 0.3 0.25 1</ambient>
+            <diffuse>0.5 0.4 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_14">
+      <static>true</static>
+      <pose>0.875 8.2 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <material>
+            <ambient>0.25 0.3 0.4 1</ambient>
+            <diffuse>0.35 0.4 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- Branch west wall (along Y): offset X by +0.075 → x=-0.875 -->
+    <model name="feat_15">
+      <static>true</static>
+      <pose>-0.875 2.2 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <material>
+            <ambient>0.25 0.3 0.4 1</ambient>
+            <diffuse>0.35 0.4 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_16">
+      <static>true</static>
+      <pose>-0.875 4.5 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material>
+            <ambient>0.4 0.3 0.25 1</ambient>
+            <diffuse>0.5 0.4 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_17">
+      <static>true</static>
+      <pose>-0.875 6.5 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <material>
+            <ambient>0.25 0.3 0.4 1</ambient>
+            <diffuse>0.35 0.4 0.5 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_18">
+      <static>true</static>
+      <pose>-0.875 8.3 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material>
+            <ambient>0.4 0.3 0.25 1</ambient>
+            <diffuse>0.5 0.4 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
   </world>
 </sdf>

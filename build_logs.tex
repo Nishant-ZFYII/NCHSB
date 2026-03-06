@@ -186,6 +186,15 @@
   \item \note{SLAM occupancy grid maps for each world still need to be generated (requires robot teleop in each world). Blocked on ros2\_control installation.}
 \end{itemize}
 
+\logentry{2026-03-05 -- Added Geometric Features + Loop Corridor}
+\begin{itemize}
+  \item \issue{User identified critical SLAM problem: all corridor walls were perfectly flat and featureless. LiDAR scan matching fails in featureless corridors (classic ``hallway problem'') --- the scan looks identical at every position along the corridor, causing localization to slide/collapse along the corridor axis.}
+  \item \fix{Added wall-mounted box protrusions (pillars 0.15$\times$0.15$\times$0.5 m, cabinets 0.3$\times$0.12$\times$0.25 m) at irregular intervals on alternating walls in all 5 corridor worlds. Total features: straight=11, lturn=16, tjunction=18, narrow=12, doorway=10. Each position now gives a unique LiDAR scan pattern.}
+  \item \issue{No closed-loop corridor existed. For benchmarking, loop corridors are important (loop closure, continuous laps, realistic indoor layouts).}
+  \item \fix{Created \texttt{corridor\_loop.sdf}: rectangular loop corridor, outer 20$\times$10 m, inner 16$\times$6 m, 2 m corridor width, 4 corners, 28 wall features at irregular intervals. Default spawn: x=-8.0, y=-4.0, yaw=0.0.}
+  \item \note{Total worlds now: 6 (was 5). Rebuild and install successful.}
+\end{itemize}
+
 \newpage
 % ============================================================
 \section{Phase 3: Pedestrian Actor System}
@@ -271,7 +280,7 @@ LiDAR-Actor Spike (Phase 0) & \textcolor{fixgreen}{Completed} & Cylinders INVISI
 \hline
 Branch Setup (Phase 1) & \textcolor{fixgreen}{Completed} & Branch \texttt{feat/corridor-social-nav} created. Both packages scaffolded. Messages defined. Hardcoded paths fixed. World typo fixed. BT install fixed. Full workspace builds (6 packages, 0 errors). \\
 \hline
-Corridor Worlds (Phase 2) & \textcolor{fixgreen}{Completed} & 5 corridor SDF worlds built and installed. SLAM occupancy grid maps still pending (needs ros2\_control for robot teleop). \\
+Corridor Worlds (Phase 2) & \textcolor{fixgreen}{Completed} & 6 corridor SDF worlds with SLAM features: straight, L-turn, T-junction, narrow, doorway, \textbf{loop} (new). 95 total wall features. SLAM maps pending. \\
 \hline
 Pedestrian Actors (Phase 3) & \textcolor{fixgreen}{Completed} & Pedestrian model SDF created. \texttt{gt\_people\_publisher.py}, \texttt{gt\_collision\_detector.py}, \texttt{goal\_sender.py} fully implemented (from placeholders). Dynamic spawning deferred to Phase 6. \\
 \hline
