@@ -75,6 +75,15 @@ ament_target_dependencies(predictive_social_layer
 rosidl_get_typesupport_target(pred_layer_typesupport ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(predictive_social_layer ${pred_layer_typesupport} corridor_frame)
 
+# ---------- Safety Shield CBF Library (no ROS dependency, testable) ----------
+add_library(safety_shield_cbf SHARED
+  src/safety_shield_cbf.cpp
+)
+target_include_directories(safety_shield_cbf PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 # ---------- Safety Shield Node ----------
 add_executable(safety_shield_node
   src/safety_shield_node.cpp
@@ -87,16 +96,18 @@ ament_target_dependencies(safety_shield_node
   rclcpp
   geometry_msgs
   nav_msgs
+  std_msgs
   tf2_ros
 )
 rosidl_get_typesupport_target(shield_typesupport ${PROJECT_NAME} "rosidl_typesupport_cpp")
-target_link_libraries(safety_shield_node ${shield_typesupport})
+target_link_libraries(safety_shield_node ${shield_typesupport} safety_shield_cbf)
 
 # ---------- Install ----------
 install(TARGETS
   corridor_frame
   social_layer
   predictive_social_layer
+  safety_shield_cbf
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
@@ -115,5 +126,16 @@ install(DIRECTORY config/
 )
 
 pluginlib_export_plugin_description_file(nav2_costmap_2d plugin_description.xml)
+
+# ---------- Tests ----------
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_safety_shield_cbf test/test_safety_shield_cbf.cpp)
+  target_include_directories(test_safety_shield_cbf PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  )
+  target_link_libraries(test_safety_shield_cbf safety_shield_cbf)
+endif()
 
 ament_package()

@@ -245,7 +245,117 @@
 % ============================================================
 \section{Phase 5: Core Algorithm Implementation}
 % ============================================================
-\textit{(to be filled)}
+
+\subsection{CBF Safety Shield --- Design Rationale}
+
+\textbf{Why CBF over simple velocity scaling?}
+The previous implementation used a basic barrier: $h = d_{\text{clear}} - d_{\text{stop}} - m_{\text{safety}}$.
+If $h < 0$ the robot stopped; if $h < m_{\text{safety}}$ it linearly scaled velocity.
+This had several problems:
+\begin{itemize}
+  \item No formal safety guarantee (forward invariance of safe set).
+  \item No accounting for pedestrian velocity (approaching vs.\ receding).
+  \item No directional awareness (ped behind treated same as ped ahead).
+  \item Simple scaling can be overly conservative (slows unnecessarily).
+\end{itemize}
+
+\textbf{CBF approach} (Ames et al.\ 2017): define a safe set $\mathcal{C} = \{x : h(x) \geq 0\}$ and enforce $\dot{h} + \alpha h \geq 0$. This guarantees forward invariance of $\mathcal{C}$ (robot stays safe if it starts safe), while minimally modifying the nominal command.
+
+\subsection{Barrier Function Design}
+
+For each pedestrian $i$, define:
+\[
+  h_i = D_i^2 - d_{\text{eff}}^2
+\]
+where $D_i = \|p_{\text{robot}} - p_{\text{ped}_i}\|$ and $d_{\text{eff}} = d_{\text{safe}} + d_{\text{stop}}(|v|)$.
+
+\textbf{Key design choices:}
+\begin{enumerate}
+  \item \textbf{Squared distance} ($D^2$ not $D$): avoids the $\sqrt{}$ computation, provides a smooth gradient everywhere (no singularity at $D=0$).
+  \item \textbf{Braking-distance enhancement}: $d_{\text{eff}}$ grows with speed via $d_{\text{stop}}(v) = a v^2 + b|v| + c$, calibrated to Ackermann braking dynamics. This is the Ackermann-aware contribution: faster $\Rightarrow$ bigger safety zone $\Rightarrow$ earlier intervention.
+  \item \textbf{$d_{\text{safe}} = r_{\text{robot}} + r_{\text{ped}} + m_{\text{safety}}$}: combined clearance envelope (0.20 + 0.25 + 0.30 = 0.75\,m default).
+\end{enumerate}
+
+\subsection{CBF Constraint Derivation}
+
+Time derivative:
+\[
+  \dot{h}_i = 2\,\Delta x_i\,(v\cos\theta - v_{x,i}) + 2\,\Delta y_i\,(v\sin\theta - v_{y,i})
+\]
+where $\Delta x_i = x_r - x_i$, $\Delta y_i = y_r - y_i$, and $(v_{x,i}, v_{y,i})$ is pedestrian velocity.
+
+This is \emph{linear in $v$} (the commanded speed). Defining:
+\begin{align}
+  a_i &= 2\,\Delta x_i\cos\theta + 2\,\Delta y_i\sin\theta \\
+  b_i &= -2\,\Delta x_i\, v_{x,i} - 2\,\Delta y_i\, v_{y,i}
+\end{align}
+the CBF condition $\dot{h}_i + \alpha\, h_i \geq 0$ becomes:
+\[
+  a_i \cdot v \geq -(b_i + \alpha\, h_i)
+\]
+
+\textbf{Sign of $a_i$ determines constraint type:}
+\begin{itemize}
+  \item $a_i > 0$: pedestrian is behind the robot $\Rightarrow$ constraint gives a \emph{lower bound} on $v$ (``don't slow down too much, you're moving away'').
+  \item $a_i < 0$: pedestrian is ahead $\Rightarrow$ constraint gives an \emph{upper bound} on $v$ (``don't go too fast toward them'').
+  \item $a_i \approx 0$: pedestrian is perpendicular to heading $\Rightarrow$ constraint is trivially satisfied (or infeasible if $h_i < 0$).
+\end{itemize}
+
+\subsection{QP Formulation}
+
+\[
+  \min_{v,\omega} \; \frac{1}{2}(v - v_{\text{nom}})^2 + \frac{1}{2}w_\omega(\omega - \omega_{\text{nom}})^2
+\]
+subject to:
+\begin{align}
+  a_i \cdot v &\geq -(b_i + \alpha\, h_i) \quad \forall\, i \in \text{peds} \\
+  v_{\min} \leq v &\leq v_{\max} \\
+  -\omega_{\max} \leq \omega &\leq \omega_{\max}
+\end{align}
+
+Since CBF constraints only involve $v$ (not $\omega$), the QP \textbf{decouples}:
+\begin{itemize}
+  \item $\omega_{\text{safe}} = \text{clamp}(\omega_{\text{nom}}, [-\omega_{\max}, \omega_{\max}])$
+  \item $v_{\text{safe}} = \text{clamp}(v_{\text{nom}}, [v_{\text{lb}}, v_{\text{ub}}])$
+\end{itemize}
+where $v_{\text{lb}}, v_{\text{ub}}$ are the tightest bounds from all CBF constraints + speed limits.
+
+This is the standard analytical solution for 1D CBF-QPs, as noted by Ames et al.\ (2017). The mathematical formulation is identical to what an OSQP solver would produce. For a 2-variable QP, the analytical solution is preferred (runs in microseconds, no external dependency). OSQP can be swapped in as a drop-in for future extensions (e.g., adding corridor boundary constraints).
+
+\subsection{Implementation Architecture}
+
+\begin{itemize}
+  \item \texttt{safety\_shield\_cbf.hpp/.cpp}: Pure C++ library, \textbf{no ROS dependency}. Contains \texttt{SafetyShieldCBF} class with \texttt{solve()}, \texttt{computeBarrier()}, \texttt{diagnose()} methods. Fully unit-testable.
+  \item \texttt{safety\_shield\_node.cpp}: ROS 2 node wrapper. Subscribes to \texttt{/cmd\_vel}, \texttt{/odom}, \texttt{/tracked\_people}. Publishes \texttt{/cmd\_vel\_safe}, \texttt{/cbf/min\_barrier}, \texttt{/cbf/intervention}. Extracts robot state from odometry (including heading from quaternion), converts TrackedPeople to PersonState vector, calls \texttt{cbf\_->solve()}.
+\end{itemize}
+
+\subsection{Test Design Rationale}
+
+27 unit tests organized by CBF safety properties:
+\begin{enumerate}
+  \item \textbf{Passivity} (3 tests): no peds $\Rightarrow$ passthrough. Far peds $\Rightarrow$ no intervention. Speed clamped to bounds.
+  \item \textbf{Monotonic intervention} (1 test): closer ped $\Rightarrow$ lower safe speed.
+  \item \textbf{Emergency stop} (1 test): ped inside $d_{\text{eff}}$ $\Rightarrow$ $v=0$, $\omega=0$.
+  \item \textbf{Velocity-dependent safety} (3 tests): $d_{\text{stop}}(v)$ grows quadratically. Higher speed $\Rightarrow$ smaller barrier. $d_{\text{eff}}$ grows monotonically.
+  \item \textbf{Directional awareness} (2 tests): ped behind $\Rightarrow$ less restrictive. Ped perpendicular $\Rightarrow$ no effect (constraint coefficient $a \approx 0$).
+  \item \textbf{Relative velocity} (2 tests): ped moving away $\Rightarrow$ more permissive. Ped approaching $\Rightarrow$ more restrictive.
+  \item \textbf{Multi-pedestrian} (2 tests): most restrictive constraint dominates. Peds on both sides both contribute.
+  \item \textbf{Minimal intervention} (3 tests): output = clamp($v_{\text{nom}}$, feasible interval). $\omega$ passes through. $\omega$ clamped to bounds.
+  \item \textbf{Barrier computation} (3 tests): positive when far, negative when close, zero at boundary.
+  \item \textbf{Diagnostics} (2 tests): reports all barrier values. Detects infeasibility.
+  \item \textbf{Edge cases} (4 tests): zero nominal, negative nominal, ped at robot position, non-zero heading.
+  \item \textbf{Regression} (1 test): diagnostic bounds match solver output.
+\end{enumerate}
+
+\logentry{2026-03-06 -- Phase 5 CBF Safety Shield Completed}
+\begin{itemize}
+  \item \fix{Replaced simple velocity-scaling safety shield with proper CBF/QP formulation.}
+  \item \textbf{Files created}: \texttt{safety\_shield\_cbf.hpp}, \texttt{safety\_shield\_cbf.cpp}, \texttt{test/test\_safety\_shield\_cbf.cpp}.
+  \item \textbf{Files modified}: \texttt{safety\_shield\_node.cpp} (rewritten to use \texttt{SafetyShieldCBF}), \texttt{CMakeLists.txt} (added library + gtest target), \texttt{package.xml} (added test dependency).
+  \item \textbf{New ROS topics}: \texttt{/cbf/min\_barrier} (Float64), \texttt{/cbf/intervention} (Bool) for monitoring.
+  \item \textbf{Test result}: 27/27 passed. Initial failure in \texttt{MinimalIntervention} test due to incorrect assumption that $v_{\text{lb}} \leq v_{\text{nom}}$ implies no intervention (missed that the upper bound from an ahead-pedestrian was the active constraint). Fixed by checking the full feasible interval.
+  \item \note{OSQP not installed on system. Analytical solver is mathematically identical for this 2-variable QP. OSQP can be added later as a drop-in replacement via \texttt{ros-humble-osqp-vendor} if the QP is extended with corridor boundary constraints.}
+\end{itemize}
 
 \newpage
 % ============================================================
@@ -290,7 +400,7 @@ Corridor Frame (Phase 5) & \textcolor{fixgreen}{Done (ahead)} & \texttt{corridor
 \hline
 Social Costmap Plugins (Phase 5) & \textcolor{fixgreen}{Done (ahead)} & Both \texttt{social\_layer.cpp} (instant Gaussian) and \texttt{predictive\_social\_layer.cpp} (corridor-frame, anisotropic, time-growing sigma) fully implemented and registered as Nav2 plugins. \\
 \hline
-CBF Safety Shield (Phase 5) & \textcolor{notblue}{Partial} & \texttt{safety\_shield\_node.cpp} has stopping-distance barrier + basic intervention logic. Missing: OSQP QP solver, adaptive speed limiting. Uses simpler scale-down. \\
+CBF Safety Shield (Phase 5) & \textcolor{fixgreen}{Completed} & Proper CBF/QP formulation with braking-distance enhanced barrier, directional + velocity-aware constraints, analytical QP solver. 27/27 unit tests pass. ROS node publishes \texttt{/cmd\_vel\_safe}, \texttt{/cbf/min\_barrier}, \texttt{/cbf/intervention}. \\
 \hline
 Scenario System (Phase 6) & \textcolor{issuered}{Pending} & No scenario YAMLs or loader. \texttt{gt\_collision\_detector.py} and \texttt{goal\_sender.py} are placeholders only. \\
 \hline
