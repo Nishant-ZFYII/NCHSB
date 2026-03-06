@@ -16,6 +16,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(osqp_vendor REQUIRED)
 
 # ---------- Message Generation ----------
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -83,6 +84,7 @@ target_include_directories(safety_shield_cbf PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
+target_link_libraries(safety_shield_cbf osqp::osqp)
 
 # ---------- Safety Shield Node ----------
 add_executable(safety_shield_node

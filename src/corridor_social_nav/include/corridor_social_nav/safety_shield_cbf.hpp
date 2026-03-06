@@ -127,6 +127,13 @@ private:
     const RobotState & robot,
     const PersonState & person) const;
 
+  SafeCommand solveAnalytical(
+    const RobotState & robot,
+    const std::vector<PersonState> & people,
+    double v_nom,
+    double omega_nom,
+    SafeCommand & result) const;
+
   CBFParams params_;
 };
 

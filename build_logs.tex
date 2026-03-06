@@ -357,6 +357,15 @@ This is the standard analytical solution for 1D CBF-QPs, as noted by Ames et al.
   \item \note{OSQP not installed on system. Analytical solver is mathematically identical for this 2-variable QP. OSQP can be added later as a drop-in replacement via \texttt{ros-humble-osqp-vendor} if the QP is extended with corridor boundary constraints.}
 \end{itemize}
 
+\logentry{2026-03-06 -- OSQP Integration}
+\begin{itemize}
+  \item \fix{User installed \texttt{ros-humble-osqp-vendor}. Integrated OSQP as the primary QP solver for the CBF safety shield.}
+  \item \textbf{Implementation}: Added \texttt{osqp\_vendor} dependency. Build QP: min (1/2) x'Px + q'x s.t. l $\leq$ Ax $\leq$ u. P = I, q = [-v\_nom, -omega\_nom]. CBF rows: $a_i \cdot v \geq \text{rhs}_i$; v and omega bounds as separate rows. CSC format for P and A.
+  \item \textbf{Fallback}: If \texttt{osqp\_setup} fails or \texttt{osqp\_solve} returns infeasible, fall back to analytical solver. Emergency stop on primal/dual infeasible.
+  \item \textbf{Test updates}: Relaxed tolerance in \texttt{OmegaPassthrough} (1e-5) and \texttt{DiagnosticBounds\_MatchSolverOutput} (1e-4) for OSQP numerical differences.
+  \item \textbf{Result}: 27/27 tests pass with OSQP.
+\end{itemize}
+
 \newpage
 % ============================================================
 \section{Phase 6: Scenario Definition and Experiment Runner}

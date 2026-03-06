@@ -300,14 +300,14 @@ TEST_F(SafetyShieldCBFTest, MinimalIntervention_OutputClosestToNominal)
 
 TEST_F(SafetyShieldCBFTest, OmegaPassthrough_WhenNoCBFConstraintOnOmega)
 {
-  // CBF constraints don't involve omega, so it should always pass through
-  // (clamped to bounds only).
+  // CBF constraints don't involve omega, so it should pass through (clamped to bounds).
+  // omega_nom=1.2 is within [-1.5, 1.5], so output should match (OSQP may have tiny numerical diff).
   RobotState robot{0.0, 0.0, 0.0, 0.5};
   std::vector<PersonState> people = {{2.0, 0.0, 0.0, 0.0}};
 
   auto result = cbf_->solve(robot, people, 0.5, 1.2);
 
-  EXPECT_DOUBLE_EQ(result.omega, 1.2);
+  EXPECT_NEAR(result.omega, 1.2, 1e-5);
 }
 
 TEST_F(SafetyShieldCBFTest, OmegaClamped_ToMaxBounds)
@@ -455,8 +455,8 @@ TEST_F(SafetyShieldCBFTest, DiagnosticBounds_MatchSolverOutput)
   auto result = cbf_->solve(robot, people, 0.8, 0.0);
 
   if (diag.feasible) {
-    EXPECT_GE(result.v, diag.v_lower_bound - 1e-10);
-    EXPECT_LE(result.v, diag.v_upper_bound + 1e-10);
+    EXPECT_GE(result.v, diag.v_lower_bound - 1e-4);
+    EXPECT_LE(result.v, diag.v_upper_bound + 1e-4);
   }
 }
 
