@@ -16,6 +16,8 @@ setup(
             glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'scenarios'),
             glob('scenarios/*.yaml')),
+        (os.path.join('share', package_name, 'scripts'),
+            glob('scripts/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -29,6 +31,7 @@ setup(
             'gt_collision_detector = corridor_social_nav_bringup.gt_collision_detector:main',
             'metrics_logger = corridor_social_nav_bringup.metrics_logger:main',
             'goal_sender = corridor_social_nav_bringup.goal_sender:main',
+            'pedestrian_driver = corridor_social_nav_bringup.pedestrian_driver:main',
         ],
     },
 )

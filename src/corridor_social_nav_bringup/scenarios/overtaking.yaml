@@ -1,0 +1,15 @@
+scenario:
+  name: overtaking
+  description: "Slow pedestrian ahead in same direction, robot must overtake safely"
+  world: corridor_straight.sdf
+  robot:
+    start: {x: -9.0, y: 0.0, yaw: 0.0}
+    goal: {x: 9.0, y: 0.0}
+  pedestrians:
+    - id: 1
+      waypoints: [[-4.0, 0.1], [9.0, 0.1]]
+      speed: {mean: 0.5, std: 0.1, min: 0.3, max: 0.7}
+      start_delay: {mean: 0.0, std: 0.0, min: 0.0, max: 0.0}
+      lateral_offset: {mean: 0.1, std: 0.1, min: -0.2, max: 0.4}
+  timeout: 90.0
+  seed_range: [0, 29]

@@ -1,0 +1,30 @@
+scenario:
+  name: bidirectional
+  description: "Multiple pedestrians in both directions simulating busy corridor"
+  world: corridor_straight.sdf
+  robot:
+    start: {x: -9.0, y: 0.0, yaw: 0.0}
+    goal: {x: 9.0, y: 0.0}
+  pedestrians:
+    - id: 1
+      waypoints: [[9.0, 0.2], [-9.0, 0.2]]
+      speed: {mean: 1.0, std: 0.2, min: 0.7, max: 1.3}
+      start_delay: {mean: 0.5, std: 0.3, min: 0.0, max: 1.5}
+      lateral_offset: {mean: 0.2, std: 0.1, min: -0.1, max: 0.5}
+    - id: 2
+      waypoints: [[-5.0, -0.2], [9.0, -0.2]]
+      speed: {mean: 0.8, std: 0.15, min: 0.5, max: 1.1}
+      start_delay: {mean: 2.0, std: 0.5, min: 1.0, max: 3.0}
+      lateral_offset: {mean: -0.2, std: 0.1, min: -0.5, max: 0.1}
+    - id: 3
+      waypoints: [[5.0, 0.3], [-9.0, 0.3]]
+      speed: {mean: 1.2, std: 0.2, min: 0.8, max: 1.5}
+      start_delay: {mean: 4.0, std: 1.0, min: 2.0, max: 6.0}
+      lateral_offset: {mean: 0.3, std: 0.1, min: 0.0, max: 0.5}
+    - id: 4
+      waypoints: [[-2.0, -0.1], [9.0, -0.1]]
+      speed: {mean: 0.9, std: 0.15, min: 0.6, max: 1.2}
+      start_delay: {mean: 3.0, std: 0.5, min: 2.0, max: 4.0}
+      lateral_offset: {mean: -0.1, std: 0.1, min: -0.4, max: 0.2}
+  timeout: 90.0
+  seed_range: [0, 29]

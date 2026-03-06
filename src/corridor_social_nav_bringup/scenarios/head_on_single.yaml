@@ -1,0 +1,15 @@
+scenario:
+  name: head_on_single
+  description: "Single pedestrian walking toward robot in straight corridor"
+  world: corridor_straight.sdf
+  robot:
+    start: {x: -9.0, y: 0.0, yaw: 0.0}
+    goal: {x: 9.0, y: 0.0}
+  pedestrians:
+    - id: 1
+      waypoints: [[9.0, 0.15], [-9.0, 0.15]]
+      speed: {mean: 1.1, std: 0.2, min: 0.8, max: 1.4}
+      start_delay: {mean: 1.0, std: 0.5, min: 0.0, max: 3.0}
+      lateral_offset: {mean: 0.15, std: 0.1, min: -0.3, max: 0.5}
+  timeout: 60.0
+  seed_range: [0, 29]

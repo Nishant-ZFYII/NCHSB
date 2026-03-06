@@ -454,6 +454,183 @@ Metrics/Analysis (Phase 7) & \textcolor{issuered}{Pending} & \texttt{metrics\_lo
   \item \note{L-turn, T-junction, narrow, doorway corridors: corners, width changes, and alcoves serve as powerful unique landmarks. Features there only supplement natural geometry --- aliasing risk is low.}
 \end{itemize}
 
+%% ═══════════════════════════════════════════════════════════════════
+%%  PHASE 6: SCENARIO SYSTEM + EXPERIMENT RUNNER
+%% ═══════════════════════════════════════════════════════════════════
+
+\section*{Phase 6: Scenario System and Experiment Runner}
+
+\subsection*{Design Rationale}
+
+The experiment pipeline must execute $\sim$1,710 simulation trials automatically:
+4 controllers $\times$ 6 scenarios $\times$ 30 seeds = 720 main trials, plus
+$\sim$990 ablation trials across 7 ablation studies. Each trial involves
+launching Gazebo, spawning the robot and pedestrians, running Nav2 with a
+specific controller config, collecting metrics, and tearing everything down
+cleanly. Manual execution is infeasible.
+
+\textbf{Key architectural decisions:}
+
+\begin{enumerate}
+  \item \textbf{Scenario YAML format}: Each of the 6 encounter types is
+    defined as a YAML file containing world reference, robot start/goal,
+    and pedestrian configurations with randomizable parameters
+    (speed, lateral offset, start delay). This separates scenario
+    \emph{definition} from \emph{execution}, enabling easy modification
+    and extension without touching any code.
+
+  \item \textbf{Seed-based deterministic randomization}: For each trial,
+    a seed is passed to \texttt{numpy.random.RandomState(seed)}.
+    All pedestrian parameters are sampled from clipped normal distributions:
+    $\text{val} = \text{clip}(\mathcal{N}(\mu, \sigma), \text{min}, \text{max})$.
+    This ensures:
+    \begin{itemize}
+      \item Reproducibility: same seed $\Rightarrow$ identical trial
+      \item Diversity: different seeds explore the parameter space
+      \item Bounds: parameters never exceed configured limits
+    \end{itemize}
+
+  \item \textbf{Pedestrian driving via Gazebo set\_pose service}: Since
+    Ignition Fortress actors with collision geometry are invisible to
+    GPU LiDAR (Phase 0 finding), pedestrians are spawned as dynamic
+    \texttt{<model>} entities. A dedicated \texttt{pedestrian\_driver}
+    ROS node moves them by calling \texttt{/world/<name>/set\_pose} at
+    20Hz, advancing each pedestrian along its waypoint path at the
+    configured speed after its start delay elapses.
+
+  \item \textbf{Nav2 controller configs}: 4 standalone YAML files were
+    created, each a complete Nav2 parameter set adapted for low-speed
+    corridor navigation ($v_{\max}=1.0$ m/s, Ackermann motion model):
+    \begin{itemize}
+      \item \texttt{nav2\_mppi\_vanilla.yaml}: Baseline MPPI, no social awareness
+      \item \texttt{nav2\_mppi\_social\_instant.yaml}: + instantaneous social costmap layer
+      \item \texttt{nav2\_mppi\_social\_pred.yaml}: + predictive corridor-frame social layer
+      \item \texttt{nav2\_full.yaml}: + predictive layer + CBF safety shield
+    \end{itemize}
+
+  \item \textbf{Metrics collection}: The \texttt{metrics\_logger} node
+    subscribes to monitoring topics and incrementally accumulates 10 metrics
+    per trial. No large buffers or replay bags---each metric is updated
+    on message arrival and written to CSV when the trial ends.
+\end{enumerate}
+
+\subsection*{6 Encounter Scenarios}
+
+\begin{tabular}{llp{6cm}l}
+\hline
+\textbf{Scenario} & \textbf{World} & \textbf{Description} & \textbf{Peds} \\
+\hline
+\texttt{head\_on\_single} & straight & 1 pedestrian walking toward robot & 1 \\
+\texttt{head\_on\_group} & straight & 3 pedestrians spanning corridor width & 3 \\
+\texttt{doorway\_popout} & doorway & 1 pedestrian emerges from alcove & 1 \\
+\texttt{junction\_crossing} & T-junction & 1 pedestrian crosses from branch & 1 \\
+\texttt{overtaking} & straight & 1 slow pedestrian ahead, same direction & 1 \\
+\texttt{bidirectional} & straight & 4 pedestrians in both directions & 4 \\
+\hline
+\end{tabular}
+
+\subsection*{Experiment Pipeline Architecture}
+
+\begin{verbatim}
+run_all_experiments.sh
+  └── run_experiment.py  (per-trial orchestrator)
+        ├── scenario_loader.py  (YAML -> TrialConfig)
+        ├── sim_experiment.launch.py  (unified ROS 2 launch)
+        │     ├── fortress_bringup.launch.py (Gazebo + robot)
+        │     ├── EKF state estimation
+        │     ├── Nav2 bringup (with controller config)
+        │     ├── ros_gz_bridge (scan, imu, clock, poses)
+        │     ├── pedestrian_driver (moves spawned models)
+        │     ├── gt_people_publisher (Gazebo -> /tracked_people)
+        │     ├── gt_collision_detector (GT collision + TTC)
+        │     ├── safety_shield_node (if enable_shield=true)
+        │     ├── metrics_logger (accumulates trial metrics)
+        │     └── goal_sender (sends NavGoal, monitors completion)
+        └── CSV output per trial
+\end{verbatim}
+
+\subsection*{Metrics Collected Per Trial}
+
+\begin{tabular}{lll}
+\hline
+\textbf{Metric} & \textbf{Source} & \textbf{Computation} \\
+\hline
+\texttt{collision\_count} & /collision\_event & Rising-edge count \\
+\texttt{min\_separation\_m} & /min\_human\_distance & Global minimum \\
+\texttt{ttc\_violations} & /gt\_ttc & Frames with TTC $< 1.0$s \\
+\texttt{shield\_interventions\_pct} & /cbf/intervention & \% of True samples \\
+\texttt{success} & /trial\_result & Parse ``SUCCESS:...'' \\
+\texttt{time\_to\_goal\_s} & /trial\_result & Elapsed time \\
+\texttt{path\_length\_m} & /odom & $\sum \sqrt{\Delta x^2 + \Delta y^2}$ \\
+\texttt{stuck\_time\_s} & /odom & $\sum dt$ where $|v| < 0.02$ m/s \\
+\hline
+\end{tabular}
+
+\subsection*{Test Strategy}
+
+Two test suites verify the pipeline's deterministic core:
+
+\textbf{1. Scenario Loader Tests (17 tests):}
+\begin{itemize}
+  \item \emph{YAML parsing}: All 6 scenario files load without error; fields match expected values.
+  \item \emph{Seed reproducibility}: Same seed produces bit-exact identical \texttt{TrialConfig}.
+  \item \emph{Seed diversity}: 30 different seeds produce distinct parameter values.
+  \item \emph{Bound enforcement}: 100 seeds sampled; all speed/delay/offset values within configured [min, max].
+  \item \emph{Waypoint offsetting}: Horizontal walk offsets Y only; vertical walk offsets X only; zero offset preserves waypoints.
+  \item \emph{Spawn commands}: Correct model name, coordinates, and SDF path in generated commands.
+  \item \emph{Edge cases}: Zero std always returns mean; collinear waypoints; single waypoint; spawn\_z = 0.85.
+  \item \emph{Multi-pedestrian diversity}: Group scenario produces different parameters per pedestrian within same seed.
+\end{itemize}
+
+\textbf{2. Metrics Computation Tests (31 tests):}
+\begin{itemize}
+  \item \emph{Collision counting}: Rising-edge detection (sustained collision counts once); rapid toggle counts correctly.
+  \item \emph{Min separation}: Tracks global minimum across increasing/decreasing sequences.
+  \item \emph{TTC violations}: Threshold at exactly 1.0s (boundary: 1.0s is NOT a violation).
+  \item \emph{Shield intervention \%}: Handles 0\%, 50\%, 100\%, and zero-total-samples cases.
+  \item \emph{Path integration}: Straight line, diagonal, return trip, stationary, single point.
+  \item \emph{Stuck time}: Always moving (0s), always stuck, partial stuck, threshold boundary.
+  \item \emph{Result parsing}: SUCCESS, TIMEOUT, ABORTED, REJECTED, TIMEOUT\_NO\_SERVER formats.
+  \item \emph{CSV output}: Correct columns, header presence, append mode for multi-trial files.
+\end{itemize}
+
+\textbf{All 48 tests pass.}
+
+\subsection*{Bug Fixes During Phase 6}
+
+\begin{itemize}
+  \item \textbf{Empty Nav2 config files}: The 4 controller variant YAMLs (\texttt{nav2\_mppi\_vanilla.yaml}, etc.) existed as 0-byte files from Phase 4. They were never actually written. Fully populated with low-speed corridor MPPI parameters.
+  \item \textbf{Missing pedestrian driver}: The scenario loader generates spawn commands but nothing was driving the pedestrians along their waypoints. Created \texttt{pedestrian\_driver.py} using Gazebo \texttt{set\_pose} service.
+\end{itemize}
+
+\subsection*{Files Created/Modified}
+
+\begin{verbatim}
+NEW:
+  scenarios/head_on_single.yaml
+  scenarios/head_on_group.yaml
+  scenarios/doorway_popout.yaml
+  scenarios/junction_crossing.yaml
+  scenarios/overtaking.yaml
+  scenarios/bidirectional.yaml
+  corridor_social_nav_bringup/scenario_loader.py
+  corridor_social_nav_bringup/pedestrian_driver.py
+  corridor_social_nav_bringup/metrics_logger.py  (rewritten from placeholder)
+  launch/sim_experiment.launch.py
+  scripts/run_experiment.py
+  scripts/run_all_experiments.sh
+  test/test_scenario_loader.py
+  test/test_metrics_computation.py
+  rc_model_description/config/nav2_mppi_vanilla.yaml  (populated)
+  rc_model_description/config/nav2_mppi_social_instant.yaml  (populated)
+  rc_model_description/config/nav2_mppi_social_pred.yaml  (populated)
+  rc_model_description/config/nav2_full.yaml  (populated)
+
+MODIFIED:
+  corridor_social_nav_bringup/setup.py  (added pedestrian_driver entry point)
+  corridor_social_nav_bringup/package.xml  (added ros_gz_interfaces dep)
+\end{verbatim}
+
 \section*{Future Work / Nice-to-Haves}
 \begin{itemize}
   \item \textbf{AWS RoboMaker Hospital World for visual fidelity}: The \texttt{aws-robomaker-hospital-world} (GitHub: \texttt{aws-robotics/aws-robomaker-hospital-world}) provides a detailed hospital environment with corridors, rooms, furniture, and human models. However:
