@@ -316,6 +316,25 @@ Metrics/Analysis (Phase 7) & \textcolor{issuered}{Pending} & \texttt{metrics\_lo
   \item \note{Loop corridor reduced from 28 to 23 features; 4 corners serve as natural landmarks.}
 \end{itemize}
 
+\logentry{2026-03-05 -- Uniqueness Verification \& User Feedback Summary}
+\begin{itemize}
+  \item \textbf{User suggestion}: Plain featureless walls will cause SLAM scan-matching to collapse along the corridor axis (classic hallway problem). Added wall-mounted geometric protrusions.
+  \item \textbf{User suggestion}: Need a closed-loop corridor for benchmarking (loop closure, continuous laps). Created \texttt{corridor\_loop.sdf}.
+  \item \textbf{User suggestion}: Features must not form a repeating pattern --- even periodic features cause SLAM aliasing. Verified and fixed: original features had near-uniform 3.0--3.5m spacing. Redesigned with all-distinct gaps.
+  \item \textbf{User question}: AWS RoboMaker Hospital World (\texttt{aws-robotics/aws-robomaker-hospital-world}) --- why not use it?
+    \begin{itemize}
+      \item Answer: targets Gazebo Classic (7.14+/9.16+), not Ignition Fortress. Different plugin API. ``Humans'' are static meshes, not pedestrians.
+      \item Middle ground: use Ignition Fuel models (chairs, carts) for visual fidelity after pipeline is complete. Cosmetic, not scientific.
+    \end{itemize}
+  \item \textbf{User question}: Why not use \texttt{gazebo\_sfm\_plugin} for pedestrian simulation?
+    \begin{itemize}
+      \item Answer: designed for Gazebo Classic. Porting to Ignition Fortress requires rewriting plugin API, actor system, and world integration. GT-pose cylinder architecture is sufficient since social stack consumes poses, not LiDAR detections.
+    \end{itemize}
+  \item \textbf{Scan uniqueness verification (straight corridor)}:
+    No translational symmetry exists because no gap value repeats across the full feature set (south gaps: 4.5, 2.9, 5.3, 3.8; north gaps: 2.5, 4.2, 2.3, 3.8, 3.2). Checked mirror positions (x vs $-$x): at x=$-$6 nearest south feature is 2.2m behind vs at x=$+$6 it is 1.5m behind. Cross-wall signatures also differ. Feature size variation (0.15, 0.20, 0.40m widths) adds LiDAR bump-width diversity. No two positions share a scan fingerprint.
+  \item \note{L-turn, T-junction, narrow, doorway corridors: corners, width changes, and alcoves serve as powerful unique landmarks. Features there only supplement natural geometry --- aliasing risk is low.}
+\end{itemize}
+
 \section*{Future Work / Nice-to-Haves}
 \begin{itemize}
   \item \textbf{AWS RoboMaker Hospital World for visual fidelity}: The \texttt{aws-robomaker-hospital-world} (GitHub: \texttt{aws-robotics/aws-robomaker-hospital-world}) provides a detailed hospital environment with corridors, rooms, furniture, and human models. However:
