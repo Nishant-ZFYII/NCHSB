@@ -677,19 +677,101 @@ ros2 launch slam_toolbox online_async_launch.py use_sim_time:=true
 ros2 run nav2_map_server map_saver_cli -f maps/<world>
     \end{verbatim}
 
-  \item \textbf{[CRITICAL] Single end-to-end smoke test before batch.}
-    Run one trial of \texttt{head\_on\_single} with the \texttt{full} controller,
-    seed 0. Manually verify:
+  \item \textbf{[CRITICAL] Smoke tests before batch --- run in order, fix before proceeding.}
+    \textbf{Do not launch the 1,710-trial batch until all of these pass.}
+    One bad configuration is cheap to fix; 85 hours of bad data is not.
+
+    \textbf{Smoke Test 1 --- World + Robot only (5 min)}
+    \begin{verbatim}
+ros2 launch rc_model_description fortress_bringup.launch.py \
+    world:=corridor_straight.sdf spawn_x:=-9.0 spawn_y:=0.0 spawn_yaw:=0.0
+    \end{verbatim}
+    \textbf{Pass criteria:}
     \begin{itemize}
-      \item All topics publishing: \texttt{/tracked\_people}, \texttt{/min\_human\_distance},
-        \texttt{/collision\_event}, \texttt{/gt\_ttc}, \texttt{/cbf/intervention},
-        \texttt{/cmd\_vel\_safe}, \texttt{/trial\_result}
-      \item \texttt{metrics\_logger} writes a valid CSV with all 10 columns
-      \item Pedestrian spawns and moves along its waypoints
-      \item Nav2 sends the robot to the goal (or times out gracefully)
+      \item Gazebo opens, robot spawns at correct position, no physics explosions.
+      \item \texttt{/scan} publishes at 25 Hz with $>$700 valid rays.
+      \item \texttt{/ground\_truth\_pose} publishes via \texttt{ros\_gz\_bridge}.
+      \item \texttt{/odom} and \texttt{/odometry/filtered} publish via EKF.
+      \item \texttt{ros2 topic hz /scan} reads $\approx$25 Hz.
     \end{itemize}
-    \textbf{Do not launch the batch until this passes.} One bad trial is cheap; 1,710
-    bad trials is 85 hours of useless data.
+
+    \textbf{Smoke Test 2 --- Pedestrian spawn + driver (5 min)}
+    \begin{verbatim}
+# After Test 1 world is running:
+ros2 run ros_gz_sim create -world default \
+    -file <path>/pedestrian/model.sdf -name pedestrian_1 \
+    -x 9.0 -y 0.15 -z 0.85
+ros2 run corridor_social_nav_bringup pedestrian_driver \
+    --ros-args -p pedestrians_json:='[{"id":1,"speed":1.0,
+    "start_delay":0.0,"waypoints":[[9.0,0.15],[-9.0,0.15]],
+    "spawn_z":0.85}]'
+    \end{verbatim}
+    \textbf{Pass criteria:}
+    \begin{itemize}
+      \item Cylinder appears in Gazebo at $(9, 0.15)$.
+      \item \texttt{/tracked\_people} publishes at $\geq$10 Hz with 1 person.
+      \item Person position in \texttt{/tracked\_people} moves from $x{=}9$ toward $x{=}{-9}$ over time.
+      \item Velocity fields in \texttt{TrackedPeople} are non-zero after 1 s.
+    \end{itemize}
+
+    \textbf{Smoke Test 3 --- GT collision detector (5 min)}
+    \begin{verbatim}
+ros2 run corridor_social_nav_bringup gt_collision_detector
+ros2 topic echo /min_human_distance --once
+ros2 topic echo /gt_ttc --once
+    \end{verbatim}
+    \textbf{Pass criteria:}
+    \begin{itemize}
+      \item \texttt{/min\_human\_distance} publishes a finite positive float.
+      \item \texttt{/gt\_ttc} publishes; value $>$ 0 when robot and pedestrian are not approaching.
+      \item Manually drive robot toward pedestrian: \texttt{/collision\_event} flips True when
+        distance $< 0.45$ m.
+    \end{itemize}
+
+    \textbf{Smoke Test 4 --- CBF safety shield (5 min)}
+    \begin{verbatim}
+ros2 run corridor_social_nav safety_shield_node
+ros2 topic pub /cmd_vel geometry_msgs/msg/Twist \
+    "{linear: {x: 1.0}, angular: {z: 0.0}}" --rate 10 &
+ros2 topic echo /cmd_vel_safe
+ros2 topic echo /cbf/intervention
+    \end{verbatim}
+    \textbf{Pass criteria:}
+    \begin{itemize}
+      \item \texttt{/cmd\_vel\_safe} publishes and matches \texttt{/cmd\_vel} when pedestrian is far.
+      \item When pedestrian is close ($<$ 1.5 m): \texttt{/cbf/intervention} goes True and
+        \texttt{/cmd\_vel\_safe.linear.x} is reduced below \texttt{/cmd\_vel.linear.x}.
+      \item \texttt{/cbf/min\_barrier} publishes and is positive when safe, approaches zero near threshold.
+    \end{itemize}
+
+    \textbf{Smoke Test 5 --- Nav2 navigation to goal (10 min)}
+    \begin{verbatim}
+# Launch with a SLAM map available:
+ros2 launch corridor_social_nav_bringup sim_experiment.launch.py \
+    world:=corridor_straight.sdf controller_config:=<path>/nav2_mppi_vanilla.yaml \
+    spawn_x:=-9.0 spawn_y:=0.0 goal_x:=9.0 goal_y:=0.0 \
+    enable_shield:=false pedestrians_json:='[]' \
+    scenario_name:=smoke_test controller_name:=mppi_vanilla seed:=0 \
+    output_file:=/tmp/smoke_test.csv timeout_s:=120.0
+    \end{verbatim}
+    \textbf{Pass criteria:}
+    \begin{itemize}
+      \item Robot navigates from $(-9, 0)$ to $(9, 0)$ without getting stuck.
+      \item \texttt{/trial\_result} publishes ``SUCCESS:\textit{T}'' within timeout.
+      \item \texttt{/tmp/smoke\_test.csv} is created with a single row and all 10 columns populated.
+      \item \texttt{success} column $= 1$, \texttt{path\_length\_m} $\approx 18$--22 m.
+    \end{itemize}
+
+    \textbf{Smoke Test 6 --- Full stack with pedestrian and shield (10 min)}\\
+    Same as Test 5 but with \texttt{controller\_config:=nav2\_full.yaml},
+    \texttt{enable\_shield:=true}, and 1 pedestrian from \texttt{head\_on\_single} seed 0.
+    \textbf{Pass criteria:}
+    \begin{itemize}
+      \item All Test 5 criteria pass.
+      \item \texttt{shield\_interventions\_pct} $> 0$ (shield fired at least once during approach).
+      \item \texttt{min\_separation\_m} $> 0.45$ (no collision).
+      \item \texttt{collision\_count} $= 0$.
+    \end{itemize}
 
   \item \textbf{[PARALLEL] Build Phase 7 analysis scripts} while batch runs overnight.
     \begin{itemize}
