@@ -706,6 +706,86 @@ ros2 run nav2_map_server map_saver_cli -f maps/<world>
     off-path offset gives correct sign/magnitude, velocity projection is correct.
 \end{enumerate}
 
+%% ═══════════════════════════════════════════════════════════════════
+%%  REVIEWER-READINESS NOTES (added 2026-03-05)
+%% ═══════════════════════════════════════════════════════════════════
+
+\logentry{2026-03-05 -- Baseline Fairness and Micro-Fixes}
+
+\subsection*{Baseline Fairness: MPPI Vanilla Framing}
+
+\begin{itemize}
+  \item \issue{Potential reviewer objection}: Because sim pedestrians are pose-driven
+    and may not be LiDAR-visible (EGL / \texttt{gpu\_lidar} quirks confirmed in Phase 0),
+    ``MPPI vanilla'' being blind to humans could look like a \emph{strawman} baseline ---
+    a controller set up to fail.
+
+  \item \fix{Reframe in the paper as follows:}
+    \begin{itemize}
+      \item The \textbf{primary} comparison is between the three socially-aware
+        configurations: \textbf{Instantaneous Social Layer} vs.\
+        \textbf{Predictive Corridor-Frame Layer} vs.\
+        \textbf{Predictive + CBF Safety Shield (Full)}.
+        This is the scientifically clean comparison --- all three receive
+        \texttt{/tracked\_people} from the GT publisher, so pedestrian visibility
+        is identical across conditions.
+      \item \textbf{MPPI vanilla} is retained but framed explicitly as:
+        \emph{``a standard obstacle-based navigation stack without explicit
+        pedestrian state input''} --- analogous to a deployed robot that has no
+        people-tracking module. It is not presented as a social navigation baseline;
+        it is the system behavior a lab or hospital would have \emph{before} adding
+        the social stack.
+      \item This framing is both honest and defensible. The vanilla controller
+        \emph{does} see pedestrians as LiDAR obstacles if they are visible; if they
+        are not, the experiment demonstrates exactly why pedestrian-state input is
+        necessary --- which strengthens the paper's motivation.
+    \end{itemize}
+
+  \item \note{Add one sentence to the paper's Experimental Setup section:
+    ``The vanilla MPPI baseline receives no \texttt{/tracked\_people} input and
+    relies solely on LiDAR-based costmap inflation for collision avoidance,
+    representing a standard deployed navigation stack without explicit social
+    awareness.''}
+\end{itemize}
+
+\subsection*{Micro-Fixes: To-Do Before Paper Submission}
+
+\begin{enumerate}
+  \item \textbf{[LOW, ROBUSTNESS] Move world/model path handling into
+    \texttt{package.xml} exports.} Currently, world and model paths are resolved
+    at launch time via \texttt{GZ\_SIM\_RESOURCE\_PATH} and
+    \texttt{IGN\_GAZEBO\_RESOURCE\_PATH} environment variables set in the launch
+    file. This is brittle: if the launch file is not sourced, or if a new machine
+    has a different workspace location, paths silently break.
+    \textbf{Better approach}: use \texttt{<gazebo\_ros>} resource\_path export in
+    \texttt{package.xml}, or consistently use \texttt{FindPackageShare} + absolute
+    SDF paths so Gazebo doesn't need environment variable hints.
+
+  \item \textbf{[MEDIUM, CORRECTNESS] Audit for Gazebo Classic plugin references.}
+    The full pipeline must use \texttt{ros\_gz\_sim} / \texttt{ros\_gz\_bridge}
+    (Ignition Fortress $\leftrightarrow$ ROS 2 Humble), NOT Gazebo Classic nodes
+    (\texttt{gazebo\_ros\_pkgs}). Any accidental mixing causes silent failures
+    (topics exist but carry no data, or node crashes at runtime).
+    \textbf{Audit checklist}:
+    \begin{itemize}
+      \item All \texttt{package.xml} exec\_depends: no \texttt{gazebo\_ros} or
+        \texttt{gazebo\_plugins} --- only \texttt{ros\_gz\_sim},
+        \texttt{ros\_gz\_bridge}, \texttt{ros\_gz\_interfaces}.
+      \item All launch files: no \texttt{gazebo} or \texttt{gzserver} executables ---
+        only \texttt{gz\_sim} (via \texttt{ros\_gz\_sim}).
+      \item All world SDFs: plugin filenames use \texttt{libignition-gazebo-*-system.so}
+        and plugin names use \texttt{ignition::gazebo::systems::*}.
+    \end{itemize}
+
+  \item \textbf{[LOW, REPRODUCIBILITY] Add a \texttt{README.md} stating the
+    Humble $\leftrightarrow$ Fortress assumption explicitly.}
+    Any collaborator or reviewer trying to reproduce results needs to know:
+    ROS 2 Humble + Ignition Fortress (Gazebo 6.x), \emph{not} Gazebo Harmonic
+    or ROS 2 Iron/Jazzy. Include the exact apt install commands used
+    (\texttt{ros-humble-ros-gz-sim}, \texttt{ros-humble-osqp-vendor}, etc.).
+    The branch \texttt{feat/corridor-social-nav} should be the entry point.
+\end{enumerate}
+
 \section*{Future Work / Nice-to-Haves}
 \begin{itemize}
   \item \textbf{AWS RoboMaker Hospital World for visual fidelity}: The \texttt{aws-robomaker-hospital-world} (GitHub: \texttt{aws-robotics/aws-robomaker-hospital-world}) provides a detailed hospital environment with corridors, rooms, furniture, and human models. However:
