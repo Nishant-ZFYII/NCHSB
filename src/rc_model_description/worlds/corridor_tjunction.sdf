@@ -408,13 +408,13 @@
     </model>
     <model name="feat_12">
       <static>true</static>
-      <pose>0.875 4.8 0.125 0 0 0</pose>
+      <pose>0.89 4.8 0.125 0 0 0</pose>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <geometry><box><size>0.12 0.3 0.25</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <geometry><box><size>0.12 0.3 0.25</size></box></geometry>
           <material>
             <ambient>0.25 0.3 0.4 1</ambient>
             <diffuse>0.35 0.4 0.5 1</diffuse>
@@ -442,13 +442,13 @@
     </model>
     <model name="feat_14">
       <static>true</static>
-      <pose>0.875 8.2 0.125 0 0 0</pose>
+      <pose>0.89 8.2 0.125 0 0 0</pose>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <geometry><box><size>0.12 0.3 0.25</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <geometry><box><size>0.12 0.3 0.25</size></box></geometry>
           <material>
             <ambient>0.25 0.3 0.4 1</ambient>
             <diffuse>0.35 0.4 0.5 1</diffuse>
@@ -460,13 +460,13 @@
     <!-- Branch west wall (along Y): offset X by +0.075 → x=-0.875 -->
     <model name="feat_15">
       <static>true</static>
-      <pose>-0.875 2.2 0.125 0 0 0</pose>
+      <pose>-0.89 2.2 0.125 0 0 0</pose>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <geometry><box><size>0.12 0.3 0.25</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <geometry><box><size>0.12 0.3 0.25</size></box></geometry>
           <material>
             <ambient>0.25 0.3 0.4 1</ambient>
             <diffuse>0.35 0.4 0.5 1</diffuse>
@@ -494,13 +494,13 @@
     </model>
     <model name="feat_17">
       <static>true</static>
-      <pose>-0.875 6.5 0.125 0 0 0</pose>
+      <pose>-0.89 6.5 0.125 0 0 0</pose>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <geometry><box><size>0.12 0.3 0.25</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <geometry><box><size>0.12 0.3 0.25</size></box></geometry>
           <material>
             <ambient>0.25 0.3 0.4 1</ambient>
             <diffuse>0.35 0.4 0.5 1</diffuse>

@@ -55,11 +55,13 @@
     <plugin filename="gz_ros2_control-system"
             name="gz_ros2_control::GazeboSimROS2ControlPlugin">
         <ros>
-            <!-- Publish TF to /tf so the rest of ROS sees odom->base_link -->
-            <remapping>ackermann_steering_controller/tf_odometry:=tf</remapping>
-
-            <!-- Optional: also expose odometry on /odom if you want the standard name -->
+            <!-- Odom on /odom (standard name) -->
             <remapping>ackermann_steering_controller/odometry:=odom</remapping>
+            <!-- Route Nav2 cmd_vel to the ackermann controller's input -->
+            <remapping>ackermann_steering_controller/reference_unstamped:=cmd_vel</remapping>
+            <!-- Do NOT remap tf_odometry to /tf: it uses TRANSIENT_LOCAL QoS
+                 which causes "jump back in time" errors across restarts.
+                 Use robot_localization EKF to publish odom->base_link TF instead. -->
         </ros>
 
         <robot_param>robot_description</robot_param>

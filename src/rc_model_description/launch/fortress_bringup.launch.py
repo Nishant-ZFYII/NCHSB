@@ -68,14 +68,19 @@ def _prepare_and_spawn(context, *args, **kwargs):
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_state_broadcaster", "--controller-manager", controller_mgr_ns],
+        arguments=["joint_state_broadcaster",
+                   "--controller-manager", controller_mgr_ns,
+                   "--controller-manager-timeout", "30"],
         output="screen",
     )
 
     ackermann_steering_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["ackermann_steering_controller", "--controller-manager", controller_mgr_ns,"--param-file", controllers_yaml_path],
+        arguments=["ackermann_steering_controller",
+                   "--controller-manager", controller_mgr_ns,
+                   "--param-file", controllers_yaml_path,
+                   "--controller-manager-timeout", "30"],
         output="screen",
     )
 
@@ -96,9 +101,9 @@ def _prepare_and_spawn(context, *args, **kwargs):
     '''
     # After defining `spawn`, `joint_state_broadcaster_spawner`, `ackermann_steering_spawner`:
 
-    spawn_robot = TimerAction(period=1.0, actions=[spawn])
-    spawn_jsb   = TimerAction(period=3.0, actions=[joint_state_broadcaster_spawner])
-    spawn_ack   = TimerAction(period=4.5, actions=[ackermann_steering_spawner])
+    spawn_robot = TimerAction(period=2.0, actions=[spawn])
+    spawn_jsb   = TimerAction(period=8.0, actions=[joint_state_broadcaster_spawner])
+    spawn_ack   = TimerAction(period=10.0, actions=[ackermann_steering_spawner])
 
     return [rsp, spawn_robot, spawn_jsb, spawn_ack, rviz]
 
@@ -156,11 +161,13 @@ def generate_launch_description():
     )
 
     # Start Gazebo (Fortress/Harmonic)
+    # -r = auto-run (don't start paused); without this the physics loop
+    # never ticks, controllers can't activate, and no odom/scan is produced.
     gz_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([ros_gz_share, 'launch', 'gz_sim.launch.py'])
         ),
-        launch_arguments={'gz_args': world_path}.items()
+        launch_arguments={'gz_args': ['-r ', world_path]}.items()
     )
 
     scan_bridge = Node(
@@ -205,6 +212,18 @@ def generate_launch_description():
     ],
     parameters=[{'use_sim_time': True}],
     )
+
+    # EKF node: fuses /odom and publishes odom -> base_link TF with VOLATILE QoS
+    ekf_config = os.path.join(
+        get_package_share_directory('rc_model_description'),
+        'config', 'ekf_imu_odom.yaml')
+    ekf_node = Node(
+        package='robot_localization',
+        executable='ekf_node',
+        name='ekf_filter_node',
+        output='screen',
+        parameters=[ekf_config, {'use_sim_time': True}],
+    )
     '''
     gt_tf_bridge = Node(
     package='ros_gz_bridge',
@@ -247,6 +266,7 @@ def generate_launch_description():
         imu_bridge,
         clock_bridge,
         gt_pose_bridge,
+        ekf_node,
         #world_odom_aligner,
         #gt_tf_bridge
     ])

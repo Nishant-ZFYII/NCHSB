@@ -144,9 +144,11 @@ def run_trial(scenario_path: str, controller: str, seed: int,
     print(f'{"="*60}\n')
 
     trial_start = time.time()
+    log_path = os.path.join(output_dir, f'{trial.scenario_name}_{controller}_seed{seed:03d}.log')
+    log_file = open(log_path, 'w')
     launch_proc = subprocess.Popen(
         launch_cmd,
-        stdout=subprocess.PIPE,
+        stdout=log_file,
         stderr=subprocess.STDOUT,
         preexec_fn=os.setsid,
     )
@@ -166,9 +168,11 @@ def run_trial(scenario_path: str, controller: str, seed: int,
             except ProcessLookupError:
                 pass
 
+    log_file.close()
     elapsed = time.time() - trial_start
     print(f'\nTrial completed in {elapsed:.1f}s')
     print(f'Metrics file: {output_file}')
+    print(f'Launch log: {log_path}')
 
     return {
         'scenario': trial.scenario_name,

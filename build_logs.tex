@@ -5,6 +5,8 @@
 \usepackage{hyperref}
 \usepackage{enumitem}
 \usepackage{datetime2}
+\usepackage{graphicx}
+\graphicspath{{docs/slam_screenshots/}}
 
 \definecolor{codebg}{RGB}{245,245,245}
 \definecolor{issuered}{RGB}{200,50,50}
@@ -867,6 +869,1722 @@ ros2 launch corridor_social_nav_bringup sim_experiment.launch.py \
     (\texttt{ros-humble-ros-gz-sim}, \texttt{ros-humble-osqp-vendor}, etc.).
     The branch \texttt{feat/corridor-social-nav} should be the entry point.
 \end{enumerate}
+
+% ============================================================
+\section{SLAM Map Generation \& World Geometry Fixes (2026-03-07)}
+% ============================================================
+
+This section documents the session focused on generating SLAM maps for all
+corridor worlds, fixing world geometry bugs discovered during visual inspection,
+and tuning SLAM Toolbox parameters to prevent perceptual aliasing.
+
+\subsection*{L-Turn Corridor: Wall Geometry Bug}
+
+\logentry{Discovery}
+During visual inspection of \texttt{corridor\_lturn.sdf} in Gazebo, two
+critical wall geometry errors were identified:
+
+\begin{enumerate}
+  \item \issue{Outer corner gap:} \texttt{wall\_south} (y=+1) ran from x=$-$10 to
+    x=0, but \texttt{wall\_east} (x=+1) ran from y=0 to y=+10. This left the
+    \textbf{outer corner of the L-turn completely open} --- a 1m gap between
+    (x=0, y=+1) and (x=+1, y=0) with no wall.
+  \item \issue{Inner walls protruding into corridor:} \texttt{wall\_north} (y=$-$1)
+    extended from x=$-$10 to x=0, but the vertical leg passable space is between
+    x=$-$1 and x=+1. The wall segment from x=$-$1 to x=0 at y=$-$1 was
+    \textbf{inside} the vertical corridor. Similarly, \texttt{wall\_west\_v}
+    (x=$-$1) ran from y=0 to y=+10, extending \textbf{into} the horizontal
+    corridor between y=0 and y=+1.
+\end{enumerate}
+
+\logentry{Root Cause}
+The original SDF treated the horizontal and vertical legs as independent corridors
+with separate wall pairs that overlapped at the corner, rather than computing the
+\emph{union} of the two corridor spaces and placing walls on its boundary.
+
+\logentry{Fix: Proper L-Shape Wall Layout}
+Rewrote \texttt{corridor\_lturn.sdf} with 6 wall segments forming the correct
+boundary of the L-shaped passable space:
+
+\begin{lstlisting}
+Passable L-shape union:
+  Horizontal leg: x in [-10, +1], y in [-1, +1]
+  Vertical leg:   x in [-1, +1],  y in [-1, +10]
+
+Wall segments (corrected):
+  wall_bottom:     y=-1, x from -10 to +1  (11m, full width)
+  wall_right:      x=+1, y from -1 to +10  (11m, full height)
+  wall_top_left:   y=+1, x from -10 to -1  (9m, stops at inner corner)
+  wall_left_upper: x=-1, y from +1 to +10  (9m, starts at inner corner)
+  wall_west:       x=-10, end cap
+  wall_north_end:  y=+10, end cap
+\end{lstlisting}
+
+The inner corner at ($-$1, +1) is where \texttt{wall\_top\_left} and
+\texttt{wall\_left\_upper} meet cleanly at a right angle. The outer corner is
+formed by the continuous \texttt{wall\_bottom} and \texttt{wall\_right} walls.
+
+14 wall-mounted features (pillars and cabinets) were repositioned to match the
+new wall layout, with features on all 4 interior wall faces.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.7\textwidth]{01_lturn_broken_walls_gazebo.png}
+  \caption{L-turn corridor before fix: Gazebo view showing the broken wall
+    geometry. The outer corner has a gap (wall ends don't meet) and the inner
+    wall segment protrudes into the vertical corridor. Entity tree still shows
+    old wall names (\texttt{wall\_south}, \texttt{wall\_east}, etc.).}
+\end{figure}
+
+\note{The T-junction (\texttt{corridor\_tjunction.sdf}) was also audited and found
+correct --- its north wall is properly split into left (x=$-$7.5 to $-$1) and
+right (x=+1 to +7.5) segments with branch walls starting at the gap edges.
+\texttt{corridor\_doorway.sdf} was also verified correct.}
+
+\subsection*{SLAM Map Generation: Perceptual Aliasing}
+
+\logentry{First Mapping Attempt --- L-Turn}
+After fixing the wall geometry, SLAM Toolbox was launched on the L-turn corridor.
+The resulting map showed severe \textbf{warping and folding} --- the classic
+signature of \textbf{perceptual aliasing}. The two legs of the L-turn have
+identical 2m width and similar feature patterns. SLAM Toolbox's correlative
+scan matcher ``recognized'' one leg as the other and incorrectly snapped the
+pose, causing the map to fold onto itself.
+
+\issue{In Gazebo, perceptual aliasing is \emph{worse} than real hardware:}
+Simulated LiDAR returns mathematically identical profiles in similar corridor
+segments with zero noise, sensor droop, or surface irregularity to differentiate
+them. Real walls have slight imperfections that provide disambiguating texture.
+
+\logentry{Root Cause Analysis}
+The original SLAM Toolbox parameters were configured aggressively for loop closing:
+\begin{itemize}
+  \item \texttt{do\_loop\_closing: true} --- allowed false loop closures between
+    similar-looking corridor segments
+  \item \texttt{loop\_search\_maximum\_distance: 8.0} --- in a 2m corridor, this
+    let SLAM match scans from one leg against the other leg
+  \item \texttt{do\_relocalization: true} --- compounded false matching
+  \item \texttt{ceres\_loss\_function: None} --- no protection against outlier
+    matches pulling the pose
+  \item \texttt{loop\_search\_space\_dimension: 10.0} --- massive search window
+  \item \texttt{correlation\_search\_space\_dimension: 1.0} --- too wide for
+    near-perfect Gazebo odometry
+\end{itemize}
+
+\logentry{Fix: SLAM Toolbox Parameter Tuning for Gazebo Corridors}
+\textbf{Key insight:} Gazebo odometry (from \texttt{ackermann\_steering\_controller}
+$\to$ EKF) is near-perfect. SLAM should only \emph{refine} the pose locally,
+never override it with a distant match.
+
+\begin{center}
+\begin{tabular}{lll}
+\textbf{Parameter} & \textbf{Before} & \textbf{After} \\
+\hline
+\texttt{ceres\_loss\_function} & None & \textbf{HuberLoss} \\
+\texttt{do\_loop\_closing} & true & \textbf{false} \\
+\texttt{do\_relocalization} & true & \textbf{false} \\
+\texttt{correlation\_search\_space\_dimension} & 1.0 & \textbf{0.5} \\
+\texttt{correlation\_search\_space\_resolution} & 0.02 & \textbf{0.01} \\
+\texttt{loop\_search\_space\_dimension} & 10.0 & \textbf{4.0} \\
+\texttt{loop\_search\_maximum\_distance} & 8.0 & \textbf{3.0} \\
+\texttt{coarse\_search\_angle\_offset} & 0.9 & \textbf{0.5} \\
+\texttt{use\_response\_expansion} & true & \textbf{false} \\
+\texttt{minimum\_angle\_penalty} & 0.7 & \textbf{0.9} \\
+\texttt{minimum\_distance\_penalty} & 0.3 & \textbf{0.5} \\
+\texttt{link\_scan\_maximum\_distance} & 3.0 & \textbf{1.5} \\
+\texttt{loop\_match\_minimum\_response\_coarse} & 0.25 & \textbf{0.35} \\
+\texttt{loop\_match\_minimum\_response\_fine} & 0.35 & \textbf{0.45} \\
+\texttt{loop\_match\_minimum\_chain\_size} & 6 & \textbf{10} \\
+\texttt{correlation\_search\_space\_smear\_deviation} & 0.1 & \textbf{0.05} \\
+\end{tabular}
+\end{center}
+
+\textbf{Rationale per parameter:}
+\begin{itemize}
+  \item \textbf{HuberLoss}: Robust cost function that down-weights outlier scan
+    matches, preventing a single bad match from pulling the entire pose estimate.
+  \item \textbf{do\_loop\_closing: false}: Prevents the scan matcher from
+    ``recognizing'' one corridor leg as another. Safe in Gazebo because odom
+    drift is negligible over 10--20m mapping runs.
+  \item \textbf{Tighter search spaces}: \texttt{correlation\_search\_space\_dimension:
+    0.5} and \texttt{resolution: 0.01} mean the scan matcher only looks within
+    $\pm$0.25m of the odom-predicted pose, with finer resolution. This trusts
+    Gazebo's near-perfect odometry.
+  \item \textbf{Higher penalties}: \texttt{minimum\_angle\_penalty: 0.9} and
+    \texttt{minimum\_distance\_penalty: 0.5} make the matcher more conservative
+    about accepting distant or rotated matches.
+  \item \textbf{use\_response\_expansion: false}: Prevents automatic widening of
+    the search window when the initial match is weak --- in a repetitive corridor,
+    expanding the search is exactly what causes aliasing.
+\end{itemize}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.7\textwidth]{02_lturn_perceptual_aliasing_warped_map.png}
+  \caption{L-turn corridor: Perceptual aliasing with original SLAM params.
+    The map is warped and folded --- the two corridor legs have identical LiDAR
+    profiles, causing the scan matcher to incorrectly ``recognize'' one leg as
+    the other and snap the pose. Classic loop closure failure in repetitive
+    environments.}
+\end{figure}
+
+\logentry{Result After Tuning}
+After applying the tuned parameters, the L-turn map generated correctly:
+clean horizontal leg, sharp 90-degree corner, clean vertical leg, with wall
+features visible as small indentations in the occupancy grid. No warping,
+folding, or ghosting.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.48\textwidth]{03_lturn_scan_rotates_with_bot.png}
+  \hfill
+  \includegraphics[width=0.48\textwidth]{04_lturn_scan_aligned_correct.png}
+  \caption{L-turn corridor after SLAM param tuning. \textbf{Left}: LiDAR scan
+    (red dots) rotates with the robot during a turn --- this is \emph{normal}
+    (scan is in \texttt{lidar\_link} frame). \textbf{Right}: When stationary,
+    the red dots align precisely with the black walls in the occupancy grid,
+    confirming correct TF chain and SLAM alignment.}
+\end{figure}
+
+\note{The LiDAR scan (red dots in RViz) rotating with the robot is
+\textbf{normal and expected behavior}. The scan is published in the
+\texttt{lidar\_link} frame (attached to the robot). RViz transforms it via
+\texttt{lidar\_link $\to$ base\_link $\to$ odom $\to$ map}. The diagnostic is
+whether the red dots \emph{align with the black walls} in the occupancy grid.
+Alignment = correct. Persistent offset = TF or SLAM error.}
+
+\note{For the closed-loop corridor (\texttt{corridor\_loop.sdf}), loop closure
+IS needed because the robot physically revisits the same location. A separate
+SLAM params file with \texttt{do\_loop\_closing: true} should be used for that
+world only.}
+
+\subsection*{Mapping Tips for Gazebo Corridors}
+
+Based on the mapping experience, the following practices produce clean maps:
+\begin{enumerate}
+  \item \textbf{Drive slowly} ($\sim$0.2 m/s). More scan overlap = less chance of
+    a bad match. At 0.5 m/s with 25 Hz LiDAR, inter-scan motion is 2cm --- good.
+    At 1.0 m/s, it's 4cm --- still OK but more risk in featureless segments.
+  \item \textbf{Use \texttt{slam\_params\_file}, NOT \texttt{params\_file}} when
+    launching SLAM Toolbox. The launch file \texttt{online\_async\_launch.py}
+    expects the argument \texttt{slam\_params\_file} to load custom configuration.
+    Using \texttt{params\_file} silently ignores the custom config and uses
+    defaults (including \texttt{base\_frame: base\_footprint}, which doesn't exist
+    in our robot's TF tree).
+  \item \textbf{Map save command:}
+\begin{lstlisting}
+mkdir -p ~/MS_Project/NCHSB/maps
+ros2 run nav2_map_server map_saver_cli \
+    -f maps/corridor_<name> \
+    --ros-args -p use_sim_time:=true
+\end{lstlisting}
+    This produces \texttt{corridor\_<name>.pgm} + \texttt{corridor\_<name>.yaml}.
+\end{enumerate}
+
+\subsection*{Correct Spawn Points for All 6 Corridor Worlds}
+
+Several corridors have different extents. Using \texttt{spawn\_x:=-9.0} for all
+worlds caused the robot to spawn outside shorter corridors. Correct spawn points:
+
+\begin{center}
+\begin{tabular}{llll}
+\textbf{World SDF} & \textbf{spawn\_x} & \textbf{spawn\_y} & \textbf{Corridor Extent} \\
+\hline
+\texttt{corridor\_straight} & $-9.0$ & $0.0$ & x: $-$10 to +10 \\
+\texttt{corridor\_lturn} & $-9.0$ & $0.0$ & horiz: x $-$10 to 0 \\
+\texttt{corridor\_tjunction} & $-6.0$ & $0.0$ & x: $-$7.5 to +7.5 \\
+\texttt{corridor\_narrow} & $-6.5$ & $0.0$ & x: $-$7.5 to +7.5 \\
+\texttt{corridor\_doorway} & $-6.5$ & $0.0$ & x: $-$7.5 to +7.5 \\
+\texttt{corridor\_loop} & $-8.0$ & $-4.0$ & outer 20$\times$10m \\
+\end{tabular}
+\end{center}
+
+\subsection*{Previous Session TF \& SLAM Debugging (2026-03-05/06) --- Summary}
+
+The following critical issues were identified and resolved during the initial
+SLAM map generation sessions. They are recorded here for future reference and
+to assist with the paper's system description.
+
+\subsubsection*{Bug: EKF Namespace Mismatch}
+\begin{itemize}
+  \item \issue{The \texttt{robot\_localization} EKF config file used namespace
+    \texttt{ekf\_imu\_odom:} but the default node name is \texttt{ekf\_filter\_node}.
+    All parameters were silently ignored.}
+  \item \fix{Changed namespace in \texttt{ekf\_imu\_odom.yaml} from
+    \texttt{ekf\_imu\_odom:} to \texttt{ekf\_filter\_node:}.}
+  \item \fix{Removed \texttt{imu0} input (no IMU sensor defined in URDF).}
+\end{itemize}
+
+\subsubsection*{Bug: TRANSIENT\_LOCAL QoS on /tf Causing Time Jumps}
+\begin{itemize}
+  \item \issue{The \texttt{gazebo\_control.xacro} contained a remapping:
+    \texttt{ackermann\_steering\_controller/tf\_odometry:=tf}. This caused the
+    ackermann controller to publish \texttt{odom $\to$ base\_link} TF on
+    \texttt{/tf} with \texttt{TRANSIENT\_LOCAL} QoS durability. When Gazebo
+    restarted, old high-timestamped messages from previous runs were replayed
+    to late-joining subscribers (RViz, SLAM Toolbox), causing ``Detected jump
+    back in time. Clearing TF buffer.'' errors.}
+  \item \fix{Removed the \texttt{tf\_odometry} remapping from
+    \texttt{gazebo\_control.xacro}. Set \texttt{enable\_odom\_tf: false} in
+    \texttt{controllers.yaml}. The EKF is now the sole publisher of
+    \texttt{odom $\to$ base\_link} TF on \texttt{/tf} with \texttt{VOLATILE}
+    QoS (default for \texttt{robot\_localization}).}
+\end{itemize}
+
+\subsubsection*{Bug: EKF predict\_to\_current\_time Causing TF Timestamp Issues}
+\begin{itemize}
+  \item \issue{Setting \texttt{predict\_to\_current\_time: true} in the EKF
+    caused TF timestamps to jump backward when real measurements (odom) arrived,
+    because the EKF would extrapolate to wall-clock time, then snap back to
+    measurement time.}
+  \item \fix{Set \texttt{predict\_to\_current\_time: false}. Added
+    \texttt{transform\_time\_offset: 0.05} to ensure EKF TF timestamps are
+    slightly ahead of scan timestamps, preventing ``extrapolation into the
+    future'' errors in SLAM Toolbox.}
+\end{itemize}
+
+\subsubsection*{Bug: SLAM Toolbox Launch Argument Name}
+\begin{itemize}
+  \item \issue{The \texttt{slam\_toolbox} launch file
+    \texttt{online\_async\_launch.py} expects the parameter
+    \texttt{slam\_params\_file} to load custom configuration, but we were passing
+    \texttt{params\_file}. This meant the custom config (which sets
+    \texttt{base\_frame: base\_link}) was \emph{never loaded}. SLAM Toolbox used
+    its default \texttt{base\_frame: base\_footprint}, which does not exist in
+    our TF tree, causing continuous ``Failed to compute odom pose'' errors.}
+  \item \fix{Changed the launch argument from \texttt{params\_file} to
+    \texttt{slam\_params\_file}.}
+\end{itemize}
+
+\subsubsection*{Bug: Teleop Not Moving Robot}
+\begin{itemize}
+  \item \issue{\texttt{teleop\_twist\_keyboard} publishes
+    \texttt{geometry\_msgs/msg/Twist} to \texttt{/cmd\_vel}, but the
+    \texttt{ackermann\_steering\_controller} was configured with
+    \texttt{use\_stamped\_vel: true}, expecting
+    \texttt{geometry\_msgs/msg/TwistStamped} on
+    \texttt{/ackermann\_steering\_controller/reference}.}
+  \item \fix{Set \texttt{use\_stamped\_vel: false} in \texttt{controllers.yaml}.
+    Teleop must publish to
+    \texttt{/ackermann\_steering\_controller/reference\_unstamped}.}
+\end{itemize}
+
+\subsubsection*{Bug: EKF Not Starting with Gazebo}
+\begin{itemize}
+  \item \issue{Launching the EKF node separately (after Gazebo) caused race
+    conditions --- the EKF sometimes started before \texttt{/odom} was available,
+    or SLAM started before the EKF published \texttt{odom $\to$ base\_link} TF.}
+  \item \fix{Added the EKF node directly to
+    \texttt{fortress\_bringup.launch.py} so it starts alongside Gazebo and
+    the robot, eliminating launch-order dependencies.}
+\end{itemize}
+
+\subsubsection*{Configuration: Miniconda Python Interference}
+\begin{itemize}
+  \item \issue{Diagnostic Python scripts failed with
+    \texttt{ModuleNotFoundError: No module named 'rclpy.\_rclpy\_pybind11'}
+    when Miniconda's Python 3.13 was active.}
+  \item \fix{Use \texttt{/usr/bin/python3} explicitly instead of \texttt{python3}
+    to ensure the system's Python 3.10 (compatible with ROS 2 Humble) is used.}
+\end{itemize}
+
+\subsection*{Files Modified in This Session}
+
+\begin{itemize}
+  \item \texttt{src/rc\_model\_description/worlds/corridor\_lturn.sdf} --- Complete
+    rewrite of wall geometry (6 walls forming correct L-boundary + 14 features).
+  \item \texttt{src/rc\_model\_description/config/mapper\_params\_online\_async.yaml}
+    --- SLAM Toolbox parameter tuning (16 parameters changed to prevent
+    perceptual aliasing).
+\end{itemize}
+
+\subsection*{T-Junction: Cabinet Feature Orientation \& Scan Matching Iteration}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.7\textwidth]{05_tjunction_bot_outside_corridor.png}
+  \caption{T-junction: Robot spawned outside corridor walls when using
+    \texttt{spawn\_x:=-9.0}. The west wall is at x=$-$7.5, so spawn must be
+    inside (e.g.\ \texttt{spawn\_x:=-6.0}).}
+\end{figure}
+
+\logentry{T-Junction Branch Wall Features}
+The T-junction branch corridor (vertical segment) had cabinet features
+(\texttt{feat\_12}, \texttt{feat\_14}, \texttt{feat\_15}, \texttt{feat\_17})
+with swapped dimensions: \texttt{0.3 x 0.12} instead of \texttt{0.12 x 0.3}.
+\begin{itemize}
+  \item \issue{For walls running along Y (branch east/west walls), cabinets
+    should protrude 0.12\,m in X and span 0.3\,m along the corridor in Y.
+    The wrong orientation had them protruding 0.3\,m (15\% of corridor width!)
+    into the 2\,m branch, with only 0.12\,m visible along the corridor.}
+  \item \fix{Changed all four branch cabinet features from \texttt{<size>0.3 0.12
+    0.25</size>} to \texttt{<size>0.12 0.3 0.25</size>}. Adjusted X pose
+    from 0.875 to 0.89 (and $-0.875$ to $-0.89$) for proper protrusion.}
+\end{itemize}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.48\textwidth]{06_tjunction_branch_ghosting_scan_matching_on.png}
+  \hfill
+  \includegraphics[width=0.48\textwidth]{07_tjunction_angular_drift_scan_matching_on.png}
+  \caption{T-junction: Scan matching ON with wide search window.
+    \textbf{Left}: Branch corridor shows ghosting/blurring with overlapping
+    wall traces. \textbf{Right}: Branch mapped at $\sim$45$^\circ$ instead of
+    90$^\circ$ --- the scan matcher accumulated angular drift at the junction.}
+\end{figure}
+
+\logentry{Attempt 1: Disable Scan Matching Entirely}
+To eliminate perceptual aliasing at junctions, \texttt{use\_scan\_matching} was
+set to \texttt{false}. The hypothesis: Gazebo odom is near-perfect, so SLAM
+should trust it completely.
+\begin{itemize}
+  \item \issue{Result was \textbf{worse}. The map showed severe ``fanning'' ---
+    scans radiating outward in multiple directions. Straight corridor mapped
+    fine; as soon as the robot turned or reversed, scans misaligned. The red
+    LiDAR points ``moved a bit back'' (shifted) when coming back along the
+    corridor.}
+  \item \fix{Root cause: Ackermann odometry has small yaw drift that
+    accumulates during turns and reverse. Without scan matching to correct it,
+    each scan is placed at a slightly wrong angle; the drift compounds and
+    produces the fanning pattern. Scan matching is \emph{needed} to fix odom
+    drift; the problem was that it was making corrections that were too large.}
+\end{itemize}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.7\textwidth]{08_tjunction_fanning_scan_matching_off.png}
+  \caption{T-junction: Scan matching OFF (\texttt{use\_scan\_matching: false}).
+    Severe ``fanning'' pattern --- each scan placed at a slightly different
+    angle due to accumulated odom yaw drift. Main corridor mapped fine;
+    the fanning appeared at the junction where the robot turned.}
+\end{figure}
+
+\logentry{Attempt 2: Tightly Constrained Scan Matching}
+Re-enabled scan matching but constrained it so it can only make \emph{small}
+corrections (fixing drift) and cannot make large jumps (which cause aliasing).
+\begin{center}
+\begin{tabular}{lll}
+\textbf{Parameter} & \textbf{Previous} & \textbf{Final} \\
+\hline
+\texttt{use\_scan\_matching} & false & \textbf{true} \\
+\texttt{minimum\_travel\_distance} & 0.50 & \textbf{0.15} \\
+\texttt{minimum\_travel\_heading} & 0.35 & \textbf{0.10} \\
+\texttt{correlation\_search\_space\_dimension} & 0.5 & \textbf{0.3} \\
+\texttt{coarse\_search\_angle\_offset} & 0.5 & \textbf{0.15} \\
+\texttt{coarse\_angle\_resolution} & 0.0349 & \textbf{0.01} \\
+\texttt{angle\_variance\_penalty} & 0.5 & \textbf{1.0} \\
+\texttt{correlation\_search\_space\_smear\_deviation} & 0.05 & \textbf{0.03} \\
+\end{tabular}
+\end{center}
+\textbf{Rationale:}
+\begin{itemize}
+  \item \textbf{Frequent scans} (0.15\,m, 0.10\,rad): Smaller pose change between
+    scans $\Rightarrow$ scan matcher has less room to go wrong. Critical at
+    junction turns where angular change is rapid.
+  \item \textbf{Tight search} (0.3\,m, 0.15\,rad $\approx$ 8.5$^\circ$): Matcher
+    can only shift pose $\pm$15\,cm and rotate $\pm$8.5$^\circ$ max. Fixes
+    sub-centimeter odom drift without being able to ``jump'' to an aliased
+    location.
+  \item \textbf{Higher angle\_variance\_penalty}: Strongly penalize angular
+    deviations so the matcher prefers small corrections.
+\end{itemize}
+
+\fix{Result: This configuration worked. The T-junction maps cleanly with
+correct 90-degree branch alignment, no fanning, and no perceptual aliasing.
+Straight corridor, L-turn, and T-junction all map correctly with the same
+params.}
+
+\note{Teleop speed 0.5\,m/s is fine for mapping. The earlier ``drive slowly''
+advice applied when scan matching was active with wider search; with tight
+constraints, speed matters less.}
+
+\subsection*{Narrow Corridor: Symmetric Features \& Missing Narrow Section Features}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.7\textwidth]{09_narrow_fanning_symmetric_features.png}
+  \caption{Narrow corridor: Fanning/ghosting below the main corridor caused by
+    the scan matcher confusing the left and right sections (identical feature
+    patterns) and the featureless narrow center section.}
+\end{figure}
+
+\logentry{Root Cause}
+The narrow corridor (\texttt{corridor\_narrow.sdf}) had two compounding issues:
+\begin{enumerate}
+  \item \issue{Left and right sections had identical (mirror-image) feature
+    patterns: same feature types in the same order with the same 1.5\,m gaps.
+    To the LiDAR, the left 2\,m-wide section looked exactly like the right
+    2\,m-wide section.}
+  \item \issue{The narrow center section (x=$-$2.5 to $+$2.5, 1.5\,m wide)
+    had \textbf{zero features} --- 5\,m of featureless corridor. The width
+    change at the transition walls was the only distinguishing element.}
+\end{enumerate}
+
+\logentry{Fix}
+Rewrote \texttt{corridor\_narrow.sdf} with asymmetric features:
+\begin{itemize}
+  \item \textbf{Left section}: 2 south (pillar, large-pillar) + 2 north
+    (cabinet, pillar). Gaps: 2.6\,m, 2.5\,m.
+  \item \textbf{Narrow section}: Added 3 features (2 south + 1 north) with
+    smaller protrusions (0.25$\times$0.12 cabinets) to fit the tighter 1.5\,m
+    width. Features positioned asymmetrically.
+  \item \textbf{Right section}: 3 south (cabinet, pillar, cabinet) + 2 north
+    (large-pillar, cabinet). Gaps: 1.2\,m, 2.0\,m --- deliberately different
+    from the left section.
+  \item Introduced a third feature size class (\textbf{large-pillar}:
+    0.20$\times$0.20) used only in the left and right sections at different
+    positions (south in left, north in right) to break symmetry.
+\end{itemize}
+
+\subsection*{Narrow Corridor: U-Turn Scan Misalignment (Expected Behavior)}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.48\textwidth]{10_narrow_uturn_mid_scan_misalign.png}
+  \hfill
+  \includegraphics[width=0.48\textwidth]{11_narrow_uturn_complete_overlap_noise.png}
+  \caption{\textbf{Left}: Mid-U-turn at the corridor end --- the red LiDAR dots
+    are misaligned from the black walls. The robot is rotating in place, and
+    during the turn the scan matcher receives a rapidly changing scan profile
+    (walls are at different angles each frame) which it cannot reliably match.
+    \textbf{Right}: After completing the full 180$^\circ$ U-turn, the scan
+    realigns with the walls and the corridor maps correctly again. The grey
+    ``noise'' around the turn point is the accumulated scans from the rotation,
+    which is cosmetic.}
+\end{figure}
+
+\logentry{Analysis}
+This is \textbf{expected behavior}, not a bug:
+\begin{itemize}
+  \item During a U-turn in a narrow corridor, the robot rotates $\sim$180$^\circ$
+    in place. Each scan during the rotation sees the corridor walls at a
+    different angle. The scan matcher's correlation search window
+    (\texttt{coarse\_search\_angle\_offset: 0.15\,rad $\approx$ 8.5$^\circ$})
+    is much smaller than the total rotation, so it \emph{cannot} match
+    consecutive scans during a fast turn. This produces the mid-turn
+    misalignment visible in image~1.
+  \item Once the turn completes and the robot faces back down the corridor,
+    the scan profile returns to ``two parallel walls'' and the matcher
+    re-locks correctly. The walls realign (image~2).
+  \item The grey smear around the turn point is cosmetic --- the occupancy
+    grid accumulated uncertain readings during the fast rotation. For
+    Nav2 navigation, the turn point is not part of the navigable corridor
+    center, so this does not affect path planning.
+  \item \textbf{Mitigation for cleaner maps}: Turn slowly. At 0.5\,m/s with
+    the Ackermann turning radius, a U-turn at the corridor end takes several
+    seconds. With \texttt{minimum\_travel\_heading: 0.10\,rad}, the mapper
+    processes a scan every $\sim$6$^\circ$ of rotation, giving the matcher
+    sufficient overlap between consecutive scans.
+  \item \fix{Verified: slow speed during U-turns produces cleaner maps with
+    less grey smear at the turn point.}
+\end{itemize}
+
+\note{This behavior will not affect experiments: the robot never U-turns during
+trials --- it drives from start to goal in one direction. Maps only need clean
+walls along the navigable corridor, not perfect coverage at the dead ends.}
+
+\subsection*{Doorway Corridor: Insufficient \& Repetitive Features}
+
+\logentry{Pre-mapping Audit}
+Before mapping \texttt{corridor\_doorway.sdf}, audited features for uniqueness.
+
+\issue{Multiple problems found:}
+\begin{enumerate}
+  \item Only 10 features for a 15\,m corridor with two alcoves --- too few.
+  \item The 7.5\,m east segment of the north wall (x=$-$2.75 to +2.0) had
+    only 2 features at x=6.0 and x=7.0, leaving the first 6\,m featureless.
+  \item West and east segment patterns were near-mirrors: pillar-cabinet-pillar
+    vs.\ cabinet-pillar-pillar with similar 1.5--2.0\,m gaps.
+  \item Alcove interiors (back walls, side walls) had zero features.
+\end{enumerate}
+
+\logentry{Fix}
+Rewrote features for \texttt{corridor\_doorway.sdf} (10 $\to$ 14 features):
+\begin{itemize}
+  \item \textbf{South wall west}: large-pillar($-$6.8), cabinet($-$4.5).
+    Gap: 2.3\,m.
+  \item \textbf{North wall west}: pillar($-$6.2), large-pillar($-$3.8),
+    cabinet($-$1.2), pillar(0.8). Gaps: 2.4, 2.6, 2.0\,m --- all distinct.
+  \item \textbf{Alcove 1 interior}: pillar on west side wall (y=1.9),
+    cabinet on back wall (x=$-$2.0).
+  \item \textbf{South wall east}: pillar(1.3), cabinet(3.6),
+    large-pillar(6.0). Gaps: 2.3, 2.4\,m.
+  \item \textbf{Alcove 2 interior}: large-pillar on east side wall
+    (0.12$\times$0.20, oriented for vertical wall), pillar on back wall.
+  \item \textbf{North wall east}: cabinet(6.8).
+  \item \textbf{Asymmetry}: South-west uses large-pillar+cabinet, south-east
+    uses pillar+cabinet+large-pillar --- different order and different feature
+    at each position. North wall has 4 features west vs.\ 1 east (compensated
+    by alcove 2 providing landmarks in that region).
+\end{itemize}
+
+\subsection*{SLAM Map Generation: Complete}
+
+All 6 corridor maps generated successfully via manual teleop driving and saved
+with \texttt{map\_saver\_cli}. Files stored in
+\texttt{src/rc\_model\_description/maps/}:
+
+\begin{center}
+\begin{tabular}{lll}
+\textbf{World} & \textbf{Files} & \textbf{Notes} \\
+\hline
+\texttt{corridor\_straight} & \texttt{.pgm + .yaml} & Clean, no issues \\
+\texttt{corridor\_lturn} & \texttt{.pgm + .yaml} & Clean after wall geometry fix \\
+\texttt{corridor\_tjunction} & \texttt{.pgm + .yaml} & Clean with tight scan matching \\
+\texttt{corridor\_narrow} & \texttt{.pgm + .yaml} & Clean after asymmetric features \\
+\texttt{corridor\_doorway} & \texttt{.pgm + .yaml} & Clean after feature redesign \\
+\texttt{corridor\_loop} & \texttt{.pgm + .yaml} & Clean without loop closure \\
+\end{tabular}
+\end{center}
+
+\note{\texttt{corridor\_loop.sdf} mapped cleanly with \texttt{do\_loop\_closing:
+false} --- the same params used for all other corridors. No separate params file
+was needed. The Gazebo odometry was accurate enough over the loop that scan
+matching alone (without loop closure) produced a correct map.}
+
+\subsection*{Files Modified (T-Junction Session)}
+
+\begin{itemize}
+  \item \texttt{corridor\_tjunction.sdf} --- Cabinet features feat\_12, 14, 15,
+    17: dimensions 0.3$\times$0.12 $\to$ 0.12$\times$0.3, pose X adjusted.
+  \item \texttt{mapper\_params\_online\_async.yaml} --- Scan matching re-enabled
+    with tight constraints (8 parameters adjusted).
+\end{itemize}
+
+% ============================================================
+\section{Phase 5: Core Algorithm Implementations}
+% ============================================================
+
+This section documents the three core algorithm components that form the paper's
+contributions (in addition to the CBF safety shield, documented earlier).
+
+\subsection*{5.1 Corridor Frame Utility (\texttt{corridor\_frame.cpp})}
+
+\logentry{Design Rationale}
+The corridor frame is a \textbf{Frenet--Serret reference frame} defined along
+the Nav2 global path. It transforms Cartesian coordinates $(x, y)$ into
+corridor-aligned coordinates $(s, d)$ where $s$ is arc-length along the corridor
+centreline and $d$ is signed lateral offset (positive = left of centreline).
+This is the mathematical foundation for the predictive social costmap layer.
+
+\textbf{Why Frenet?} In a corridor, Cartesian predictions spread risk across the
+full width even when a pedestrian is clearly walking along one side. The Frenet
+frame aligns the prediction with the corridor geometry, making risk tubes narrow
+along the lateral axis and extended along the corridor axis --- exactly matching
+how pedestrians actually move.
+
+\logentry{Mathematical Formulation}
+
+\textbf{Path representation:} A polyline of $N$ waypoints
+$\{(x_0,y_0), \ldots, (x_{N-1},y_{N-1})\}$ extracted from the Nav2 global plan.
+Arc-length is pre-computed:
+\[
+  L_0 = 0, \quad L_i = L_{i-1} + \|(x_i - x_{i-1}, y_i - y_{i-1})\|_2
+\]
+
+\textbf{Cartesian $\to$ Frenet} (\texttt{toFrenet}):
+For a query point $(x, y)$, find the closest point on the polyline by projecting
+onto each segment $[(x_i, y_i), (x_{i+1}, y_{i+1})]$:
+\[
+  t_i = \mathrm{clamp}\left(
+    \frac{(x - x_i)(x_{i+1} - x_i) + (y - y_i)(y_{i+1} - y_i)}
+         {\|(x_{i+1} - x_i, y_{i+1} - y_i)\|_2^2},\; 0,\; 1
+  \right)
+\]
+\[
+  s = L_i + t_i \cdot \|(\Delta x, \Delta y)\|_2, \quad
+  d = \mathrm{sign}(\Delta x \times (y - y_i)) \cdot \|P_\mathrm{query} - P_\mathrm{proj}\|_2
+\]
+where the cross product determines the sign (positive = left of path direction).
+
+\textbf{Frenet $\to$ Cartesian} (\texttt{toCartesian}):
+Given $(s, d)$, find the segment containing $s$ by binary search on $L_i$.
+Interpolate the centreline point, compute the unit normal $\hat{n} = (-t_y, t_x)$
+(perpendicular to segment tangent), and offset: $(x, y) = P_\mathrm{centreline}
++ d \cdot \hat{n}$.
+
+\textbf{Velocity transformation} (\texttt{toFrenetState}):
+Given Cartesian velocity $(v_x, v_y)$ at position $(x, y)$:
+\[
+  \dot{s} = v_x \cdot t_x + v_y \cdot t_y, \quad
+  \dot{d} = -v_x \cdot t_y + v_y \cdot t_x
+\]
+where $(\hat{t}_x, \hat{t}_y)$ is the unit tangent of the closest segment.
+
+\logentry{Implementation Details}
+\begin{itemize}
+  \item \textbf{File}: \texttt{src/corridor\_social\_nav/src/corridor\_frame.cpp}
+  \item \textbf{Header}: \texttt{include/corridor\_social\_nav/corridor\_frame.hpp}
+  \item \textbf{Classes}: \texttt{CorridorFrame}, \texttt{FrenetPoint} (s, d),
+    \texttt{FrenetState} (s, d, $\dot{s}$, $\dot{d}$)
+  \item \textbf{Path update}: Called whenever Nav2 publishes a new global plan
+    on \texttt{/plan}. Recomputes cumulative arc-length array.
+  \item \textbf{Projection}: Linear scan over all segments ($O(N)$). Acceptable
+    for corridor paths ($N \sim 50$--$200$ waypoints).
+  \item \textbf{Edge cases}: Returns $(0, 0)$ if path has $<2$ waypoints.
+    Clamps $s$ to $[0, L_\mathrm{total}]$ in \texttt{toCartesian}.
+    Skips zero-length segments.
+\end{itemize}
+
+% ------------------------------------------------------------------
+
+\subsection*{5.2 Instantaneous Social Costmap Layer (\texttt{social\_layer.cpp})}
+
+\logentry{Design Rationale}
+The baseline social navigation approach. Stamps an isotropic Gaussian cost
+around each tracked person's \emph{current} position. No prediction, no
+velocity information used. This serves as the ``MPPI+Social'' controller
+in the paper's comparison table.
+
+\logentry{Mathematical Formulation}
+For each person $k$ at position $(p_x^k, p_y^k)$ and each costmap cell
+at world coordinates $(w_x, w_y)$:
+\[
+  C(w_x, w_y) = A \cdot \exp\!\left(
+    -\frac{(w_x - p_x^k)^2 + (w_y - p_y^k)^2}{2\sigma^2}
+  \right)
+\]
+\begin{itemize}
+  \item \textbf{Amplitude} $A$: Default 252 (just below \texttt{LETHAL\_OBSTACLE}
+    = 254). High enough to strongly repel the MPPI planner.
+  \item \textbf{Sigma} $\sigma$: Default 0.5\,m. Controls the radius of
+    influence --- at $2\sigma = 1.0$\,m, cost drops to $A \cdot e^{-2} \approx
+    34$.
+  \item \textbf{Cutoff}: Cost is not computed beyond
+    \texttt{cutoff\_distance} (default 2.0\,m) for performance.
+  \item \textbf{Cost combination}: \texttt{max} operation --- if multiple people
+    overlap, the highest cost wins (conservative).
+\end{itemize}
+
+\logentry{Implementation Details}
+\begin{itemize}
+  \item \textbf{File}: \texttt{src/corridor\_social\_nav/src/social\_layer.cpp}
+  \item \textbf{Plugin class}: \texttt{corridor\_social\_nav::SocialLayer}
+  \item \textbf{Registered in}: \texttt{plugin\_description.xml} for
+    \texttt{nav2\_costmap\_2d}
+  \item Subscribes to \texttt{/tracked\_people} (\texttt{SensorDataQoS})
+  \item Thread-safe via \texttt{std::mutex} on people data
+  \item \texttt{updateBounds}: Expands costmap update region by
+    \texttt{cutoff\_distance} around each person
+  \item \texttt{updateCosts}: Iterates cells within bounds, computes Gaussian,
+    writes cost via \texttt{setCost} with max semantics
+  \item \textbf{Parameters} (configurable via Nav2 YAML):
+    \texttt{gaussian\_sigma}, \texttt{amplitude}, \texttt{cutoff\_distance}
+\end{itemize}
+
+% ------------------------------------------------------------------
+
+\subsection*{5.3 Predictive Corridor-Frame Social Costmap Layer (\texttt{predictive\_social\_layer.cpp})}
+
+\logentry{Design Rationale}
+This is the \textbf{core paper contribution} (Section IV-B). Instead of
+stamping risk at the person's current position only, it:
+\begin{enumerate}
+  \item Converts each pedestrian's state to the Frenet frame $(s, d, \dot{s}, \dot{d})$
+  \item Predicts their trajectory over a horizon $T$ using constant-velocity
+    propagation in the corridor frame
+  \item Stamps \textbf{anisotropic Gaussian risk tubes} along the predicted
+    trajectory with \textbf{time-growing uncertainty}
+\end{enumerate}
+
+This produces elliptical cost ``tubes'' that align with the corridor direction
+and grow wider over the prediction horizon, naturally encoding the principle
+that near-future positions are more certain than far-future ones.
+
+\logentry{Mathematical Formulation}
+
+For each person $k$ with Frenet state $(s_k, d_k, \dot{s}_k, \dot{d}_k)$
+and each prediction time step $\tau \in \{0, \Delta\tau, 2\Delta\tau, \ldots, T\}$:
+
+\textbf{Predicted position:}
+\[
+  \hat{s}_k(\tau) = s_k + \dot{s}_k \cdot \tau, \quad
+  \hat{d}_k(\tau) = d_k + \dot{d}_k \cdot \tau
+\]
+
+\textbf{Time-growing uncertainty:}
+\[
+  \sigma_s(\tau) = \sigma_{s,0} + k_s \cdot \tau, \quad
+  \sigma_d(\tau) = \sigma_{d,0} + k_d \cdot \tau
+\]
+
+\textbf{Anisotropy}: If $|\dot{s}_k| > 0.1$ m/s (person is moving along
+corridor), $\sigma_s$ is scaled by 1.5$\times$ to elongate the risk tube in
+the direction of motion.
+
+\textbf{Cost at each cell} in Frenet coordinates $(s_\mathrm{cell}, d_\mathrm{cell})$:
+\[
+  C_\tau = \exp\!\left(
+    -\frac{(s_\mathrm{cell} - \hat{s}_k(\tau))^2}{2\sigma_s(\tau)^2}
+    -\frac{(d_\mathrm{cell} - \hat{d}_k(\tau))^2}{2\sigma_d(\tau)^2}
+  \right)
+\]
+\[
+  C_\mathrm{person} = \max_{\tau \in [0, T]} C_\tau, \quad
+  C_\mathrm{cell} = \min\!\left(
+    \max_k C_\mathrm{person}^k \cdot C_\mathrm{max},\;
+    C_\mathrm{max}
+  \right)
+\]
+
+\textbf{Fallback (global frame)}: When \texttt{use\_corridor\_frame: false}
+(for ablation), predictions are done in Cartesian coordinates with isotropic
+Gaussians of radius $\sigma_{s,0} + k_s \cdot \tau$.
+
+\logentry{Parameters (Paper Section IV-B)}
+\begin{center}
+\begin{tabular}{llp{7cm}}
+\textbf{Parameter} & \textbf{Default} & \textbf{Meaning} \\
+\hline
+\texttt{prediction\_horizon} & 2.0\,s & How far ahead to predict \\
+\texttt{prediction\_step} & 0.2\,s & Time resolution (10 steps per horizon) \\
+\texttt{sigma\_s\_0} & 0.3\,m & Initial uncertainty along corridor \\
+\texttt{sigma\_d\_0} & 0.2\,m & Initial uncertainty across corridor \\
+\texttt{k\_s} & 0.3\,m/s & Growth rate of $\sigma_s$ \\
+\texttt{k\_d} & 0.1\,m/s & Growth rate of $\sigma_d$ \\
+\texttt{max\_cost} & 252.0 & Amplitude (below LETHAL) \\
+\texttt{anisotropic} & true & Enable $1.5\times$ elongation \\
+\texttt{use\_corridor\_frame} & true & false $\to$ global-frame fallback \\
+\end{tabular}
+\end{center}
+
+\logentry{Implementation Details}
+\begin{itemize}
+  \item \textbf{File}: \texttt{src/corridor\_social\_nav/src/predictive\_social\_layer.cpp}
+  \item \textbf{Plugin class}: \texttt{corridor\_social\_nav::PredictiveSocialLayer}
+  \item Subscribes to \texttt{/tracked\_people} (\texttt{SensorDataQoS}) and
+    \texttt{/plan} (transient local QoS, Nav2 global path)
+  \item Uses \texttt{CorridorFrame} instance to convert between Cartesian and
+    Frenet coordinates
+  \item \texttt{updateBounds}: Expands by $T \cdot 2.0 + 2.0$ meters around
+    each person (conservative bound for prediction tube extent)
+  \item \texttt{updateCosts}: For each cell, transforms to Frenet, evaluates
+    the maximum cost across all prediction time steps and all people
+  \item Links against \texttt{corridor\_frame} shared library
+\end{itemize}
+
+\subsection*{5.4 CBF/QP Safety Shield (Previously Documented)}
+
+See Phase 5 section earlier in this document for the full CBF safety shield
+documentation, including the OSQP integration and 27 unit tests.
+
+\subsection*{Plugin Registration}
+
+Both costmap layers are registered in \texttt{plugin\_description.xml}:
+\begin{lstlisting}
+<class name="corridor_social_nav::SocialLayer"
+       type="corridor_social_nav::SocialLayer"
+       base_class_type="nav2_costmap_2d::Layer">
+</class>
+<class name="corridor_social_nav::PredictiveSocialLayer"
+       type="corridor_social_nav::PredictiveSocialLayer"
+       base_class_type="nav2_costmap_2d::Layer">
+</class>
+\end{lstlisting}
+
+The Nav2 YAML configs (\texttt{nav2\_mppi\_social\_instant.yaml},
+\texttt{nav2\_mppi\_social\_pred.yaml}, \texttt{nav2\_full.yaml}) reference
+these plugins in their \texttt{local\_costmap.plugins} list.
+
+\subsection*{Build Targets}
+
+All components compile as shared libraries via \texttt{CMakeLists.txt}:
+\begin{center}
+\begin{tabular}{llp{6cm}}
+\textbf{Target} & \textbf{Type} & \textbf{Dependencies} \\
+\hline
+\texttt{corridor\_frame} & Shared lib & \texttt{nav\_msgs} \\
+\texttt{social\_layer} & Shared lib (plugin) & \texttt{nav2\_costmap\_2d},
+  \texttt{pluginlib}, \texttt{TrackedPeople} msg \\
+\texttt{predictive\_social\_layer} & Shared lib (plugin) & Above +
+  \texttt{corridor\_frame} lib \\
+\texttt{safety\_shield\_cbf} & Shared lib & \texttt{osqp::osqp} \\
+\texttt{safety\_shield\_node} & Executable & \texttt{safety\_shield\_cbf},
+  \texttt{TrackedPeople} msg \\
+\end{tabular}
+\end{center}
+
+% ============================================================
+\section{Phase 7: Verification Tests}
+% ============================================================
+
+This section documents the unit and integration tests written to verify the
+mathematical correctness of the core algorithm components.
+
+\subsection*{7.1 Corridor Frame Tests (\texttt{test\_corridor\_frame.cpp})}
+
+\logentry{Test Design Rationale}
+The corridor frame is the mathematical backbone of the predictive social costmap.
+If \texttt{toFrenet} or \texttt{toCartesian} have bugs, the entire risk-tube
+prediction projects costs to wrong cells, silently producing incorrect results.
+Tests are organized around six critical properties:
+
+\begin{enumerate}
+  \item \textbf{Round-trip identity}: $\mathrm{toCartesian}(\mathrm{toFrenet}(x,y))
+    = (x,y)$ for any point on or near the path. This is the single most important
+    invariant. Tested on straight paths, L-shaped paths, and offset points.
+  \item \textbf{Arc-length consistency}: $s$ increases monotonically along the
+    path. \texttt{totalLength()} equals the sum of segment lengths. Tested for
+    straight, L-shaped, and diagonal paths.
+  \item \textbf{Lateral sign convention}: $d > 0$ means left of path (CCW from
+    tangent). Getting this wrong flips the ``keep-right'' penalty. Tested for
+    east-going and north-going paths.
+  \item \textbf{Velocity decomposition}: $\dot{s}$ is positive when moving along
+    path direction; $\dot{d}$ is zero when moving exactly along-path. Tested for
+    along-path, against-path, lateral-only, and diagonal velocities.
+  \item \textbf{Multi-segment paths}: Projection works correctly across segment
+    boundaries (L-shaped paths, zig-zag paths).
+  \item \textbf{Edge cases}: Empty path, single-point path, query beyond path
+    endpoints, path update clearing previous data.
+\end{enumerate}
+
+\logentry{Test Count}
+\textbf{26 test cases} across 6 categories, all compiled as a GTest target
+\texttt{test\_corridor\_frame} registered in \texttt{CMakeLists.txt}.
+
+% ------------------------------------------------------------------
+
+\subsection*{7.2 Social Costmap Math Tests (\texttt{test\_social\_costmap\_math.cpp})}
+
+\logentry{Test Design Rationale}
+The \texttt{SocialLayer} and \texttt{PredictiveSocialLayer} are Nav2 costmap
+plugins that require the full Nav2 stack for their \texttt{onInitialize}/
+\texttt{updateCosts} methods. However, the \emph{core cost computation is pure
+math} that can be extracted and tested directly. We replicate the exact cost
+formulas from the source files so any formula change triggers a test failure.
+
+\textbf{Part A --- Instantaneous Gaussian (SocialLayer math, 7 tests):}
+\begin{enumerate}
+  \item Peak cost at person position equals amplitude
+  \item Exponential decay with distance (verified at $1\sigma$, $2\sigma$)
+  \item Isotropic symmetry: cost equal in all cardinal directions at equal distance
+  \item Cutoff: zero cost beyond \texttt{cutoff\_distance}
+  \item Max-combine semantics for multiple equidistant people
+  \item Amplitude clamping below \texttt{LETHAL\_OBSTACLE} (253)
+  \item Boundary behavior at exactly cutoff distance
+\end{enumerate}
+
+\textbf{Part B --- Predictive Anisotropic (PredictiveSocialLayer math, 11 tests):}
+\begin{enumerate}
+  \item Peak at stationary pedestrian position = \texttt{max\_cost}
+  \item Risk tube extends in direction of predicted path
+  \item Risk tube reaches prediction horizon
+  \item Uncertainty grows with prediction time
+  \item Anisotropy factor ($1.5\times$) activates for $|\dot{s}| > 0.1$
+  \item Anisotropy inactive for slow pedestrians ($|\dot{s}| < 0.1$)
+  \item Elliptical shape verification ($\sigma_s \neq \sigma_d$)
+  \item Corridor-frame vs global-frame produces different costs
+  \item Max over timesteps (cell at predicted position at $\tau = 1$s)
+  \item Max across multiple people
+  \item Stationary ped: no risk tube extension beyond growing $\sigma$
+  \item Global-frame fallback: risk higher ahead of moving person
+\end{enumerate}
+
+\textbf{Part C --- Integration (Corridor Frame + Predictive Cost, 2 tests):}
+\begin{enumerate}
+  \item Straight corridor: approaching pedestrian Frenet state decomposition
+  \item L-shaped corridor: person on vertical segment Frenet projection
+\end{enumerate}
+
+\logentry{Test Count}
+\textbf{20 test cases} compiled as GTest target \texttt{test\_social\_costmap\_math}.
+
+% ------------------------------------------------------------------
+
+\subsection*{7.3 CBF Safety Shield Tests (Previously Documented)}
+
+27 test cases covering passivity, monotonic intervention, emergency stop,
+velocity-dependent safety, directional awareness, relative velocity,
+multi-pedestrian, and minimal intervention properties.
+
+% ------------------------------------------------------------------
+
+\subsection*{7.4 Metrics Computation Tests (\texttt{test\_metrics\_computation.py})}
+
+8 test classes with 21 test cases covering collision counting (rising-edge),
+min separation tracking, TTC violation counting, shield intervention percentage,
+path length integration, stuck time accumulation, result string parsing, and
+CSV output format. Previously documented.
+
+\subsection*{Test Summary Table}
+
+\begin{center}
+\begin{tabular}{llr}
+\textbf{Test File} & \textbf{Component} & \textbf{Cases} \\
+\hline
+\texttt{test\_corridor\_frame.cpp} & Frenet frame math & 28 \\
+\texttt{test\_social\_costmap\_math.cpp} & Social + Predictive costmap math & 20 \\
+\texttt{test\_safety\_shield\_cbf.cpp} & CBF/QP safety shield & 27 \\
+\texttt{test\_metrics\_computation.py} & Metrics logger logic & 31 \\
+\texttt{test\_scenario\_loader.py} & Scenario YAML + seeded RNG & (existing) \\
+\hline
+\textbf{Total} & & \textbf{106+} \\
+\end{tabular}
+\end{center}
+
+\subsection*{7.5 Test Build \& Execution Log}
+
+\logentry{Build Verification (2026-03-05)}
+All tests compiled and executed successfully.
+
+\issue{Two initial test failures (fixed immediately):}
+\begin{enumerate}
+  \item \texttt{SocialLayerMath.CutoffAtBoundary}: Test expected zero cost at
+    exactly \texttt{cutoff\_distance}, but the code uses \texttt{dist\_sq >
+    cutoff * cutoff} (strict greater-than), so at the boundary
+    $\mathrm{dist\_sq} = \mathrm{cutoff}^2$, the condition is \texttt{false}
+    and cost \emph{is} computed. \fix{Corrected assertion to \texttt{EXPECT\_GT(cost, 0.0)}
+    at boundary, \texttt{EXPECT\_NEAR(cost, 0.0)} just beyond.}
+  \item \texttt{PredictiveLayerMath.EllipticalShape}: Test assumed cost at
+    $1\sigma$ offset equals $e^{-0.5}$, but the predictive cost takes
+    \texttt{max} over all prediction timesteps. For a stationary pedestrian,
+    later timesteps have larger $\sigma$ values, producing higher cost at the
+    same offset. Example: at $\sigma_{s,0}$ offset along $s$, $\tau=0$ gives
+    $e^{-0.5}$, but $\tau=2.0$s with $\sigma_s = 0.9$ gives $e^{-0.154} = 0.857$.
+    \fix{Rewrote test to verify the correct property: $\sigma_s$ grows faster
+    ($k_s = 0.3$) than $\sigma_d$ ($k_d = 0.1$), so at equal offset,
+    along-path cost exceeds lateral cost due to the max-over-time mechanism.}
+\end{enumerate}
+
+\logentry{Final Test Results}
+\begin{verbatim}
+$ colcon test --packages-select corridor_social_nav
+100% tests passed, 0 tests failed out of 3
+  test_safety_shield_cbf ......... Passed  (27 tests)
+  test_corridor_frame ............ Passed  (28 tests)
+  test_social_costmap_math ....... Passed  (21 tests)
+
+$ python3 -m pytest test/test_metrics_computation.py
+31 passed in 0.10s
+\end{verbatim}
+
+\textbf{All 107+ tests pass.}
+
+% ============================================================
+\section{Phase 7: Analysis Scripts}
+% ============================================================
+
+\subsection*{7.5 \texttt{analyze\_results.py} --- Statistical Analysis \& LaTeX Tables}
+
+\logentry{Purpose}
+Reads the combined CSV from all experiment trials, computes per-controller and
+per-scenario statistics, performs statistical significance tests, and generates
+publication-ready LaTeX tables.
+
+\logentry{Outputs}
+\begin{enumerate}
+  \item \texttt{table\_main\_results.tex}: Main comparison table (4 controllers
+    aggregated across all scenarios). Columns: Success \%, Collision \%, Min
+    Separation ($\mu \pm \sigma$), Time-to-Goal ($\mu \pm \sigma$), Shield \%.
+  \item \texttt{table\_per\_scenario.tex}: Full breakdown per scenario $\times$
+    controller.
+  \item \texttt{table\_significance.tex}: Statistical significance of ``Full
+    (Ours)'' vs each baseline. Uses:
+    \begin{itemize}
+      \item \textbf{Fisher's exact test} on success rates (2$\times$2 contingency
+        table: success/fail $\times$ controller).
+      \item \textbf{Wilcoxon signed-rank test} on paired metrics (same seeds):
+        min separation and time-to-goal. Paired because each seed defines the
+        same pedestrian configuration across controllers.
+    \end{itemize}
+  \item \texttt{summary\_stats.csv}: Machine-readable summary for plotting scripts.
+\end{enumerate}
+
+\logentry{Usage}
+\begin{verbatim}
+python3 analyze_results.py --input results/all_trials.csv \
+                           --output-dir results/tables/
+\end{verbatim}
+
+% ------------------------------------------------------------------
+
+\subsection*{7.6 \texttt{plot\_results.py} --- Publication Figures}
+
+\logentry{Purpose}
+Generates publication-quality matplotlib figures from experiment CSV data.
+
+\logentry{Outputs}
+\begin{enumerate}
+  \item \textbf{Box plots} (aggregate): Min separation, time-to-goal, path length
+    by controller. Shows median, quartiles, and outliers.
+  \item \textbf{Bar chart}: Success rate and collision rate side-by-side per
+    controller with percentage annotations.
+  \item \textbf{Shield activity chart}: CBF intervention percentage per scenario
+    (Full controller only), showing when the safety shield is most active.
+  \item \textbf{Per-scenario box plots}: Min separation and time-to-goal broken
+    down by scenario, comparing all controllers within each scenario.
+\end{enumerate}
+
+\logentry{Design Choices}
+\begin{itemize}
+  \item Consistent color scheme across all figures: grey (MPPI), blue
+    (MPPI+Social), orange (MPPI+Pred), green (Full/Ours).
+  \item 300 DPI for main figures, 200 DPI for per-scenario (many files).
+  \item \texttt{matplotlib.use("Agg")} for headless server rendering.
+\end{itemize}
+
+\logentry{Usage}
+\begin{verbatim}
+python3 plot_results.py --input results/all_trials.csv \
+                        --output-dir results/figures/
+\end{verbatim}
+
+% ============================================================
+
+\section*{Phase 8: Smoke Test \& Launch Debugging}
+
+\subsection*{8.1 Duplicate EKF Node}
+
+\logentry{Error}
+\texttt{sim\_experiment.launch.py} launched its own \texttt{ekf\_filter\_node} (lines
+121--131), but \texttt{fortress\_bringup.launch.py} (which it includes) already
+launches the same node.  Running two EKF nodes on the same TF frames causes
+\texttt{odom -> base\_link} conflicts and unpredictable behaviour.
+
+\logentry{Fix}
+Removed the duplicate EKF node definition from \texttt{sim\_experiment.launch.py}.
+Updated the docstring numbering (items 1--9) and added a note:
+\emph{``EKF is launched inside fortress\_bringup.launch.py, NOT here.''}
+
+% ------------------------------------------------------------------
+
+\subsection*{8.2 \texttt{run\_experiment.py} Pipe-Buffer Stall}
+
+\logentry{Error}
+\texttt{run\_experiment.py} used \texttt{subprocess.PIPE} for \texttt{stdout},
+which causes the pipe buffer to fill for a long-running ROS 2 launch process.
+The trial process exited in $\sim$1.8\,s with exit code 1 and
+\texttt{[WARN] Trial completed but no metrics file found!}.
+
+\logentry{Fix}
+Replaced \texttt{stdout=subprocess.PIPE} with \texttt{stdout=log\_file}, where
+\texttt{log\_file} is opened as
+\texttt{<scenario>\_<controller>\_seed<NNN>.log} alongside the CSV.
+This allows the launch to run without pipe stalls and preserves all output for
+post-mortem debugging.
+
+% ------------------------------------------------------------------
+
+\subsection*{8.3 JSON Parameter YAML-Parsing Crash}
+
+\logentry{Error}
+Launching \texttt{sim\_experiment.launch.py} with a \texttt{pedestrians\_json}
+argument containing a JSON array (e.g.\
+\texttt{'[\{"id":1,"speed":1.1,...\}]'}) caused an immediate crash:
+\begin{verbatim}
+[ERROR] [launch]: Caught exception in launch:
+  Expected a non-empty sequence, with items of uniform
+  type. Allowed sequence item types are bool, int, float, str.
+\end{verbatim}
+
+\logentry{Root Cause}
+ROS\,2's \texttt{launch\_ros} parameter handling infers types using a YAML
+parser.  A value starting with \texttt{[} is parsed as a YAML sequence.  The
+items inside (JSON dicts like \texttt{\{"id":1,...\}}) are not one of the
+allowed scalar types (\texttt{bool}, \texttt{int}, \texttt{float},
+\texttt{str}), so the type inference throws.
+
+This is a well-known pitfall: any ROS\,2 node parameter whose \emph{value}
+happens to look like valid YAML (lists, dicts, nested structures) will be
+auto-parsed instead of kept as a raw string.
+
+\logentry{Fix}
+Imported \texttt{ParameterValue} from \texttt{launch\_ros.parameter\_descriptions}
+and wrapped the \texttt{pedestrians\_json} parameter:
+\begin{verbatim}
+'pedestrians_json': ParameterValue(
+    LaunchConfiguration('pedestrians_json'), value_type=str),
+\end{verbatim}
+This forces the launch system to treat the value as a plain string, bypassing
+YAML type inference entirely.  The pedestrian driver node then parses the JSON
+string internally with Python's \texttt{json.loads()}.
+
+% ------------------------------------------------------------------
+
+\subsection*{8.4 Controller Activation Timeout --- Gazebo Starting Paused}
+
+\logentry{Error}
+First manual smoke test launched all processes but:
+\begin{enumerate}
+  \item Both controller spawners timed out:
+\begin{verbatim}
+[ERROR] [controller_manager]: Switch controller timed out
+        after 5.000000 seconds!
+[ERROR] [spawner_joint_state_broadcaster]: Failed to activate
+[ERROR] [spawner_ackermann_steering_controller]: Failed to activate
+\end{verbatim}
+  \item No robot model or LiDAR points visible in RViz (see
+    Figure~\ref{fig:smoke1}).
+  \item Nav2 costmap reported: \texttt{Timed out waiting for transform from base\_link
+    to odom\ldots{} frame does not exist}
+  \item All Python nodes crashed on shutdown with \texttt{rcl\_shutdown already called}.
+\end{enumerate}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\textwidth]{smoke_test1_no_robot_no_lidar.png}
+  \caption{Smoke test 1: RViz shows Global Status error, no robot model, no LiDAR
+    points.  Map loads but TF tree is broken and scan topic has no data.}
+  \label{fig:smoke1}
+\end{figure}
+
+\logentry{Root Cause Analysis (cascade)}
+\begin{enumerate}
+  \item \textbf{Gazebo starts paused}: The \texttt{gz\_sim.launch.py} was called
+    with only the world path as \texttt{gz\_args}.  Without \texttt{-r} (run),
+    Gazebo starts in a paused state --- physics never ticks.  Evidence: controller
+    manager logged \texttt{gazebo simulation period (0 s)}.
+  \item \textbf{Controllers cannot activate}: The \texttt{gz\_ros2\_control}
+    hardware interface needs at least one physics step to report joint states.
+    With period = 0, the switch request blocks until the 5\,s timeout.
+  \item \textbf{No odometry}: Ackermann controller never activated, so \texttt{/odom}
+    is never published.
+  \item \textbf{EKF starved}: \texttt{robot\_localization} receives no \texttt{/odom}
+    messages, so it never publishes the \texttt{odom $\to$ base\_link} TF.
+  \item \textbf{Nav2 blocked}: Costmap activation requires \texttt{odom} frame
+    in TF.  Without it, the activation loop spins forever.
+  \item \textbf{No LiDAR}: \texttt{gpu\_lidar} sensor doesn't produce scans when
+    physics is paused (update depends on sim steps).
+  \item \textbf{RViz blank}: No TF tree $\Rightarrow$ robot model cannot be
+    displayed; no scan data $\Rightarrow$ no red points.
+\end{enumerate}
+
+\logentry{Fixes Applied}
+\begin{enumerate}
+  \item \textbf{Auto-run Gazebo}: Changed \texttt{gz\_args} from
+    \texttt{world\_path} to \texttt{['-r ', world\_path]} in
+    \texttt{fortress\_bringup.launch.py}.  The \texttt{-r} flag starts
+    Gazebo's physics loop immediately.
+  \item \textbf{Increased controller spawner timeouts}: Added
+    \texttt{--controller-manager-timeout 30} to both spawner argument lists.
+    Raised \texttt{TimerAction} delays: robot spawn at 2\,s, JSB spawner at
+    8\,s, Ackermann spawner at 10\,s (was 1/3/4.5\,s).
+  \item \textbf{Increased Nav2 / goal\_sender delays}: Nav2
+    \texttt{bringup\_launch.py} now starts at $t+15$\,s (was 8\,s);
+    \texttt{goal\_sender} at $t+30$\,s (was 15\,s), giving controllers time
+    to fully activate and odometry to flow.
+  \item \textbf{Fixed \texttt{rclpy.shutdown()} crash}: All four Python nodes
+    (\texttt{pedestrian\_driver}, \texttt{gt\_collision\_detector},
+    \texttt{gt\_people\_publisher}, \texttt{goal\_sender}) now guard shutdown
+    with \texttt{if rclpy.ok():} and catch
+    \texttt{rclpy.executors.ExternalShutdownException}.  This prevents the
+    ``already called'' crash when the ROS\,2 signal handler shuts down the
+    context before the \texttt{finally} block.
+\end{enumerate}
+
+\logentry{Full TF Chain Analysis}
+The expected TF chain for the full Nav2 stack to work is:
+\begin{verbatim}
+map --> odom --> base_link --> chassis_link --> lidar_link
+  |       |           |
+ AMCL    EKF      robot_state_publisher (static)
+\end{verbatim}
+Each link and its dependencies:
+\begin{enumerate}
+  \item \texttt{base\_link $\to$ chassis\_link $\to$ lidar\_link} (and all other
+    robot links): Published by \texttt{robot\_state\_publisher} from
+    \texttt{/robot\_description}.  This works independently of everything else.
+    \textbf{Status in log}: Working (lines 16--31: all segments loaded).
+  \item \texttt{odom $\to$ base\_link}: Published by EKF
+    (\texttt{robot\_localization/ekf\_node}).  Requires input from
+    \texttt{/odom} topic (Ackermann controller output).
+    \textbf{Status in log}: Not working.  EKF has no input because Ackermann
+    controller never activated.
+  \item \texttt{map $\to$ odom}: Published by AMCL after it localizes the robot
+    in the static map.  Requires: (a) \texttt{/scan} data, (b)
+    \texttt{odom $\to$ base\_link} TF (to transform scans into the odom frame),
+    (c) the static map from \texttt{map\_server}.
+    \textbf{Status in log}: Not working.  AMCL loaded the map (line 215:
+    ``Received a 405 $\times$ 48 map'') but could not transform scans.  Line 318:
+    ``\texttt{Message Filter dropping message: frame 'lidar\_link'}\ldots{}
+    \texttt{queue is full}'' --- scan messages pile up because TF from
+    \texttt{lidar\_link} to \texttt{odom} does not exist.
+\end{enumerate}
+
+\noindent The break point is step 2: without the Ackermann controller running
+(because Gazebo was paused), the entire TF chain from \texttt{odom} upward is
+broken.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\textwidth]{smoke_test2_map_loaded_no_scan.png}
+  \caption{Smoke test 2: Map loads (corridor\_straight with wall features visible),
+    robot model partially visible, but Global Status error persists.  No LiDAR
+    scan points due to broken \texttt{odom $\to$ base\_link} TF.  Navigation and
+    Localization status both ``unknown.''}
+  \label{fig:smoke2}
+\end{figure}
+
+\logentry{Secondary Issue: AMCL Message Filter Queue Full}
+Log line 318: \texttt{[amcl]: Message Filter dropping message: frame
+'lidar\_link' at time 2.120 for reason 'discarding message because the queue
+is full'}.  This occurs because:
+\begin{itemize}
+  \item AMCL's message filter waits for the TF from \texttt{lidar\_link} to
+    \texttt{odom} before processing each scan.
+  \item Without \texttt{odom $\to$ base\_link}, the transform never becomes
+    available.
+  \item Scan messages accumulate in the filter's queue until it overflows.
+  \item RViz shows the same symptom (line 319).
+\end{itemize}
+This is a \emph{consequence} of the paused Gazebo root cause, not a separate
+bug.
+
+\logentry{Secondary Issue: \texttt{rclpy.shutdown()} Double-Call Crash}
+On Ctrl-C, all four Python nodes (\texttt{pedestrian\_driver},
+\texttt{gt\_collision\_detector}, \texttt{gt\_people\_publisher},
+\texttt{goal\_sender}) crashed with:
+\begin{verbatim}
+rclpy._rclpy_pybind11.RCLError: failed to shutdown:
+  rcl_shutdown already called on the given context
+\end{verbatim}
+This happens because the ROS\,2 launch system's signal handler calls
+\texttt{rclpy.shutdown()} on SIGINT before the nodes' \texttt{finally} blocks
+execute.  The fix adds \texttt{if rclpy.ok():} guards and catches
+\texttt{ExternalShutdownException}.
+
+\logentry{Verification}
+After applying fixes, the installed launch file was verified to contain:
+\begin{itemize}
+  \item \texttt{gz\_args: ['-r ', world\_path]} --- auto-run
+  \item \texttt{--controller-manager-timeout 30} --- both spawners
+  \item \texttt{TimerAction} delays: 2\,s / 8\,s / 10\,s --- spawn / JSB / Ackermann
+  \item Nav2 at $t+15$\,s, goal\_sender at $t+30$\,s
+  \item \texttt{tf\_odometry} remapping confirmed absent from installed xacro
+    (only present as a comment explaining why it was removed)
+\end{itemize}
+
+% ------------------------------------------------------------------
+
+\subsection*{8.5 Deeper Smoke Test Analysis --- Three Remaining Issues}
+
+After fixing the paused-Gazebo root cause (\S8.4), the controllers activated
+(confirmed: \texttt{/odom} at $\sim$4\,Hz, \texttt{/odometry/filtered}
+present), but the robot still did not appear in RViz and \texttt{/tracked\_people}
+carried no data.  Running SLAM Toolbox instead of Nav2 \emph{did} show the
+robot and LiDAR correctly (Figure~\ref{fig:smoke3}), proving the TF chain
+\texttt{odom $\to$ base\_link} was intact.  Three additional issues were
+identified.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\textwidth]{smoke_test3_slam_works_nav2_no_localize.png}
+  \caption{SLAM Toolbox run alongside the smoke test.  The robot model,
+    LiDAR points, and inflation layer are all visible because SLAM Toolbox
+    provides \texttt{map $\to$ odom} directly.  Nav2's AMCL does not.}
+  \label{fig:smoke3}
+\end{figure}
+
+\subsubsection*{Issue A: AMCL Missing Initial Pose}
+
+\logentry{Symptom}
+RViz showed the map but no robot, no scan, and Navigation / Localization status
+``unknown.''  SLAM Toolbox worked because it provides \texttt{map $\to$ odom}
+from scan matching --- no initial pose needed.
+
+\logentry{Root Cause}
+Nav2's AMCL requires an initial pose hypothesis before it starts publishing
+\texttt{map $\to$ odom}.  By default it waits for a \texttt{/initialpose}
+message (the ``2D Pose Estimate'' button in RViz).  Our Nav2 configs did not
+set \texttt{set\_initial\_pose: true}, so AMCL never localized.
+
+\logentry{Fix}
+Added to \emph{all four} Nav2 config files
+(\texttt{nav2\_mppi\_vanilla.yaml}, \texttt{nav2\_mppi\_social\_instant.yaml},
+\texttt{nav2\_mppi\_social\_pred.yaml}, \texttt{nav2\_full.yaml}):
+\begin{verbatim}
+amcl:
+  ros__parameters:
+    set_initial_pose: true
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      yaw: 0.0
+\end{verbatim}
+The initial pose $(0,0,0)$ matches the robot's spawn location in the SLAM-generated
+map coordinate frame.  AMCL will converge from this prior on the first few scans.
+
+\subsubsection*{Issue B: Pedestrian Models Never Spawned}
+
+\logentry{Symptom}
+\texttt{pedestrian\_driver} logged ``\texttt{pedestrian\_1 started moving}'' but
+\texttt{ros2 topic echo /tracked\_people --once} returned no data.
+
+\logentry{Root Cause}
+\texttt{pedestrian\_driver.py} calls \texttt{set\_pose} to \emph{move} a model
+named \texttt{pedestrian\_1}, but \textbf{nobody spawns that model into Gazebo}.
+The spawn command (\texttt{ros2 run ros\_gz\_sim create -file model.sdf -name
+pedestrian\_1 \ldots}) was missing from \texttt{sim\_experiment.launch.py}.
+
+The \texttt{set\_pose} service silently ignores requests for non-existent
+entities --- no error is logged, the pedestrian just never appears.
+
+\logentry{Fix}
+Added \texttt{\_spawn\_pedestrians()} OpaqueFunction to
+\texttt{sim\_experiment.launch.py}.  It:
+\begin{enumerate}
+  \item Parses the \texttt{pedestrians\_json} LaunchConfiguration.
+  \item For each pedestrian, spawns a \texttt{pedestrian/model.sdf} cylinder
+    into Gazebo at the first waypoint position using
+    \texttt{ros2 run ros\_gz\_sim create}.
+  \item Runs at $t+5$\,s via TimerAction (after Gazebo world loads but before
+    Nav2 starts).
+\end{enumerate}
+
+\subsubsection*{Issue C: \texttt{/tracked\_people} and
+  \texttt{/min\_human\_distance} Empty}
+
+\logentry{Symptom}
+\texttt{ros2 topic echo /tracked\_people --once} hung indefinitely.
+\texttt{ros2 topic echo /min\_human\_distance --once} also hung.
+
+\logentry{Root Cause}
+This is a \emph{consequence} of Issue B.  The data dependency chain is:
+\begin{verbatim}
+pedestrian model in Gazebo
+  --> dynamic_pose bridge publishes TF for pedestrian_* frames
+    --> gt_people_publisher filters for pedestrian_ prefix
+      --> publishes /tracked_people
+        --> gt_collision_detector computes distances
+          --> publishes /min_human_distance
+\end{verbatim}
+Since no pedestrian model existed in Gazebo, the \texttt{dynamic\_pose} bridge
+had nothing to publish, so the entire chain was empty.
+
+\logentry{Fix}
+Resolved by Issue B fix (spawning pedestrian models).
+
+\logentry{Topic Verification (pre-fix)}
+The topic list confirmed all topics \emph{existed} but most carried no data:
+\begin{verbatim}
+/scan                        ✓  (~4 Hz)
+/odom                        ✓
+/odometry/filtered           ✓
+/tracked_people              exists, no data
+/min_human_distance          exists, no data
+/collision_event             exists, no data
+/trial_result                exists, no data
+\end{verbatim}
+
+% ------------------------------------------------------------------
+
+\subsection*{8.6 Smoke Test 4 --- Near-Success, Goal Sender Timing Race}
+
+After applying fixes from \S8.4 and \S8.5, the smoke test achieved:
+\begin{itemize}
+  \item Gazebo running with \texttt{-r} flag ($\text{sim period}=0.001$\,s)
+  \item Both controllers activated cleanly (no timeouts)
+  \item Pedestrian cylinder spawned and visible in Gazebo
+    (Figure~\ref{fig:smoke4_gz})
+  \item AMCL localized with auto-set initial pose
+  \item All Nav2 managed nodes active with bond timers
+  \item LiDAR scans visible in RViz (Figure~\ref{fig:smoke4_rviz1})
+  \item Nav2 costmaps, global path, and inflation layer all visible
+    (Figure~\ref{fig:smoke4_rviz2})
+  \item \texttt{/tracked\_people} publishing data with correct pedestrian position
+  \item \texttt{/min\_human\_distance} returning $\sim$9.0\,m (robot at $x{=}{-}9$,
+    pedestrian at $x{=}9$)
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.48\textwidth]{smoke_test4_lidar_scans_loaded.png}
+  \hfill
+  \includegraphics[width=0.48\textwidth]{smoke_test4_nav2_costmap_path.png}
+  \caption{Left (Figure~\ref{fig:smoke4_rviz1}): RViz showing robot model,
+    LiDAR scans (red), and map with Global Status OK.  Right
+    (Figure~\ref{fig:smoke4_rviz2}): Nav2 costmaps loaded with inflation layer
+    (cyan/magenta), global path (green), and local costmap.}
+  \label{fig:smoke4_rviz1}
+  \label{fig:smoke4_rviz2}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\textwidth]{smoke_test4_pedestrian_in_gazebo.png}
+  \caption{Gazebo view showing the corridor\_straight world with wall features
+    (brown box protrusions) and the spawned pedestrian cylinder visible in the
+    corridor.  Entity tree confirms world structure.}
+  \label{fig:smoke4_gz}
+\end{figure}
+
+\logentry{Single Remaining Failure: Goal Sender Timing Race}
+The robot did not move because the \texttt{goal\_sender} timed out before Nav2
+was ready:
+\begin{verbatim}
+[goal_sender] Action server not available after 30s
+[goal_sender] Published trial result: TIMEOUT_NO_SERVER
+\end{verbatim}
+
+Timeline analysis (all times relative to launch):
+\begin{itemize}
+  \item $t{+}30$\,s: \texttt{goal\_sender} starts, begins
+    \texttt{wait\_for\_server(30s)}
+  \item $t{+}60$\,s: \texttt{goal\_sender} gives up
+    (\texttt{TIMEOUT\_NO\_SERVER})
+  \item $t{+}65$\,s: \texttt{bt\_navigator} finishes activating (creates
+    \texttt{navigate\_to\_pose} action server)
+\end{itemize}
+The goal sender missed the action server by $\sim$5 seconds.
+
+\logentry{Fix}
+\begin{enumerate}
+  \item Increased \texttt{goal\_sender} launch delay from 30\,s to 45\,s in
+    \texttt{sim\_experiment.launch.py}.
+  \item Increased \texttt{wait\_for\_server} timeout from 30\,s to 60\,s in
+    \texttt{goal\_sender.py}.
+  \item Combined: goal sender now starts at $t{+}45$\,s and waits until
+    $t{+}105$\,s if needed.  Nav2 activation at $\sim t{+}65$\,s is well
+    within this window.
+\end{enumerate}
+
+\logentry{Secondary Fix: Stale Build Files}
+The \texttt{rclpy.shutdown()} guard fix from \S8.4 was not picked up by
+\texttt{colcon build --symlink-install}.  For ament\_python packages, the
+build directory may contain copies rather than symlinks.  Fixed by deleting
+\texttt{build/} and \texttt{install/} for the bringup package and rebuilding
+from clean.  Verified with \texttt{grep} that the build directory now contains
+the \texttt{rclpy.ok()} guard.
+
+\logentry{Pedestrian Movement Verification}
+Log confirmed:
+\begin{verbatim}
+[pedestrian_driver] pedestrian_1 started moving (delay=1.0s)
+... (117s wall clock later) ...
+[pedestrian_driver] pedestrian_1 reached final waypoint
+\end{verbatim}
+The pedestrian traversed the full 18\,m corridor at 1.1\,m/s in sim time.
+Wall clock time was $\sim$117\,s due to Gazebo running at $\sim$11\% real-time
+speed (typical for GPU LiDAR simulation on desktop hardware).
+
+% ------------------------------------------------------------------
+
+\subsection*{8.7 Smoke Test 5 --- Goal Rejected During Nav2 Initialization}
+
+Everything from Smoke Test~4 continued to work (Gazebo running, controllers,
+pedestrian spawned and moving, AMCL localized, all topics publishing).
+However the goal was \textbf{REJECTED} by Nav2.
+
+\logentry{Root Cause: bt\_navigator Lifecycle Race}
+Nav2's \texttt{bt\_navigator} creates the \texttt{navigate\_to\_pose} action
+server during its \textbf{configure} lifecycle phase, but only \emph{accepts}
+goals after its \textbf{activate} phase.  The \texttt{lifecycle\_manager\_navigation}
+transitions nodes sequentially:
+\texttt{controller\_server} $\to$ \texttt{smoother\_server} $\to$
+\texttt{planner\_server} $\to$ \texttt{behavior\_server} $\to$
+\texttt{bt\_navigator} $\to$ \texttt{waypoint\_follower} $\to$
+\texttt{velocity\_smoother}.
+
+Timeline (wall clock seconds from launch):
+\begin{center}
+\begin{tabular}{rl}
+$t{+}58.3$\,s & \texttt{bt\_navigator} begins \emph{Configuring}
+  (action server created) \\
+$t{+}58.6$\,s & \texttt{goal\_sender} discovers action server, sends goal \\
+$t{+}58.8$\,s & \textbf{Goal REJECTED} (bt\_navigator not yet active) \\
+$t{+}59.9$\,s & \texttt{bt\_navigator} \emph{Activating} (would now accept goals) \\
+\end{tabular}
+\end{center}
+
+\logentry{Fix: Goal Sender Retry Logic}
+Rewrote \texttt{goal\_sender.py} with a retry mechanism:
+\begin{itemize}
+  \item After \texttt{wait\_for\_server(60s)} succeeds, send goal via
+    \texttt{\_attempt\_send\_goal()}.
+  \item If \texttt{goal\_response\_cb} sees rejection and retries remain
+    ($\text{max}=10$), schedule a retry after 3\,s using a one-shot timer.
+  \item Cancel the retry timer before re-sending to prevent duplicate sends.
+  \item Added \texttt{\_done} flag to prevent multiple result publications
+    during shutdown races.
+\end{itemize}
+
+\logentry{Fix: rclpy.shutdown() Race Condition}
+The \texttt{if rclpy.ok(): rclpy.shutdown()} pattern has a TOCTOU race:
+\texttt{rclpy.ok()} returns True, then the SIGINT signal handler calls
+\texttt{rclpy.shutdown()} on another thread, and our code's subsequent
+\texttt{rclpy.shutdown()} call fails.  Fixed all four Python nodes
+(\texttt{goal\_sender}, \texttt{pedestrian\_driver},
+\texttt{gt\_people\_publisher}, \texttt{gt\_collision\_detector}) to wrap
+\texttt{destroy\_node()} and \texttt{rclpy.shutdown()} in separate
+\texttt{try/except Exception} blocks.
+
+Clean-rebuilt the bringup package (deleted \texttt{build/} and
+\texttt{install/} directories) and verified fixes in the build directory.
+
+% ------------------------------------------------------------------
+
+\subsection*{8.8 Smoke Test 6 --- Empty Behavior Tree}
+
+The goal sender retry logic worked: goal accepted on attempt~2.  However the
+goal was immediately \textbf{ABORTED}:
+\begin{verbatim}
+[BehaviorTreeEngine]: Behavior tree threw exception:
+    Empty Tree. Exiting with failure.
+[bt_navigator]: Goal failed
+\end{verbatim}
+
+\logentry{Root Cause}
+All four Nav2 config YAMLs had \texttt{default\_nav\_to\_pose\_bt\_xml: ""}
+(empty string).  In Nav2~Humble, an explicit empty string overrides the
+built-in default behavior tree.  The \texttt{bt\_navigator} loads an empty
+XML, producing the ``Empty Tree'' error.
+
+\logentry{Fix}
+Set the BT XML paths to Nav2's default behavior trees in all five config
+files:
+\begin{verbatim}
+default_nav_to_pose_bt_xml:
+  /opt/ros/humble/share/nav2_bt_navigator/behavior_trees/
+  navigate_to_pose_w_replanning_and_recovery.xml
+default_nav_through_poses_bt_xml:
+  /opt/ros/humble/share/nav2_bt_navigator/behavior_trees/
+  navigate_through_poses_w_replanning_and_recovery.xml
+\end{verbatim}
+
+% ------------------------------------------------------------------
+
+\subsection*{8.9 Smoke Test 7 --- cmd\_vel Topic Mismatch (Robot Not Moving)}
+
+The behavior tree fix resolved the ABORTED error.  Nav2 accepted the goal,
+computed a global path (visible in RViz), and the controller\_server began
+computing velocity commands.  However the robot never physically moved.
+After $\sim$130\,s wall clock, the progress checker fired:
+\begin{verbatim}
+[controller_server]: Failed to make progress
+\end{verbatim}
+
+\logentry{Root Cause: cmd\_vel Topic Disconnect}
+Nav2's \texttt{navigation\_launch.py} uses these remappings:
+\begin{center}
+\begin{tabular}{lll}
+\textbf{Node} & \textbf{Publishes to} & \textbf{Subscribes from} \\
+\hline
+controller\_server & \texttt{/cmd\_vel\_nav} & --- \\
+velocity\_smoother & \texttt{/cmd\_vel} & \texttt{/cmd\_vel\_nav} \\
+\hline
+ackermann\_steering\_controller & --- & \texttt{/.../reference\_unstamped} \\
+\end{tabular}
+\end{center}
+The velocity\_smoother was publishing to \texttt{/cmd\_vel}, but the
+ackermann\_steering\_controller subscribed to its own namespaced topic
+\texttt{/ackermann\_steering\_controller/reference\_unstamped}.
+\textbf{No node was listening to Nav2's output.}
+
+\logentry{Fix}
+Added a remapping in \texttt{gazebo\_control.xacro} inside the
+\texttt{GazeboSimROS2ControlPlugin} \texttt{<ros>} block:
+\begin{verbatim}
+<remapping>ackermann_steering_controller/reference_unstamped
+    :=cmd_vel</remapping>
+\end{verbatim}
+This causes the controller to subscribe to \texttt{/cmd\_vel} instead of its
+default namespaced topic, completing the topic chain:
+\begin{verbatim}
+controller_server → /cmd_vel_nav → velocity_smoother → /cmd_vel
+    → ackermann_steering_controller
+\end{verbatim}
+
+% ------------------------------------------------------------------
+
+\subsection*{8.10 Shutdown Behavior Summary}
+
+\logentry{Current Shutdown Flow}
+\begin{enumerate}
+  \item \texttt{goal\_sender} publishes trial result to \texttt{/trial\_result}
+    $\to$ calls \texttt{rclpy.shutdown()} $\to$ process exits cleanly.
+  \item \texttt{metrics\_logger} receives trial result $\to$ writes CSV
+    $\to$ calls \texttt{rclpy.shutdown()} $\to$ process exits cleanly.
+  \item \textbf{All other processes keep running} (Gazebo, Nav2, bridges,
+    collision detector, pedestrian driver) because no process is marked
+    \texttt{required} in the launch file for auto-shutdown.
+  \item User must \texttt{Ctrl+C} to terminate the launch system.
+  \item On SIGINT, the launch system sends SIGINT to all child processes.
+    Some (especially the Nav2 composable container) require escalation to
+    SIGTERM and eventually SIGKILL, which is normal.
+\end{enumerate}
+
+\logentry{Shutdown Errors (All Cosmetic, Do Not Affect Trial Data)}
+\begin{itemize}
+  \item \textbf{RViz exit code -11 (SIGSEGV)}: Common crash when Gazebo shuts
+    down and the rendering pipeline loses resources. Harmless.
+  \item \textbf{Nav2 container SIGKILL escalation}: The composable container
+    with $\sim$12 lifecycle nodes takes longer than 5\,s to deactivate.
+    Launch escalates SIGINT $\to$ SIGTERM $\to$ SIGKILL. Harmless.
+  \item \textbf{gt\_collision\_detector RuntimeError}: rclpy Humble race
+    condition where \texttt{take\_message()} is called on an invalidated DDS
+    handle during shutdown. Fixed by catching \texttt{RuntimeError} in the
+    \texttt{except} clause.
+  \item \textbf{``Failed to publish log message to rosout''}: Nodes try to log
+    after their ROS context is invalidated. Cosmetic.
+  \item \textbf{pedestrian\_driver / gt\_people\_publisher exit code 1}:
+    Fixed by wrapping \texttt{rclpy.shutdown()} in \texttt{try/except}.
+\end{itemize}
+
+\logentry{For Automated Experiments}
+The \texttt{run\_experiment.py} script launches \texttt{sim\_experiment.launch.py}
+as a subprocess and monitors \texttt{/trial\_result} (or uses a wall-clock
+timeout). When the trial ends, it sends SIGINT to the launch subprocess,
+collects the CSV, and proceeds to the next trial. Manual \texttt{Ctrl+C} is
+not needed in automated mode.
+
+% ------------------------------------------------------------------
+
+\subsection*{8.11 Smoke Test Progress Summary (End of Day 2)}
+
+\logentry{What Works}
+\begin{itemize}
+  \item Gazebo launches with \texttt{-r} flag (not paused), physics at 0.001\,s
+    period
+  \item Robot spawns, \texttt{ros2\_control} activates both controllers
+    (joint\_state\_broadcaster + ackermann\_steering\_controller)
+  \item Pedestrian cylinder model spawns into Gazebo and moves along waypoints
+  \item EKF publishes \texttt{odom $\to$ base\_link} transform
+  \item AMCL auto-localizes with \texttt{set\_initial\_pose: true}, publishes
+    \texttt{map $\to$ odom} transform
+  \item All Nav2 lifecycle nodes activate (map\_server, amcl, controller\_server,
+    planner\_server, bt\_navigator, behavior\_server, velocity\_smoother,
+    waypoint\_follower)
+  \item Behavior tree loads successfully (\texttt{navigate\_to\_pose\_w\_replanning\_and\_recovery.xml})
+  \item Goal sender retries on rejection, goal accepted on attempt 2
+  \item Global path computed and visible in RViz
+  \item MPPI controller computes velocity commands at $\sim$20\,Hz (with
+    occasional rate misses due to CPU load)
+  \item \texttt{cmd\_vel} remapping connects Nav2 output to ackermann controller
+    (confirmed: deprecation warnings show controller receiving Twist messages
+    at $\sim$20\,Hz from goal acceptance onward)
+  \item \texttt{/tracked\_people} publishes pedestrian data correctly
+  \item \texttt{/min\_human\_distance} reports correct distances
+  \item Metrics logger writes CSV with partial data on interrupt
+  \item Odometry reports \texttt{path\_length\_m: 8.172} --- robot IS moving
+  \item LiDAR scans, costmaps, and inflation layers all visible in RViz
+\end{itemize}
+
+\logentry{Remaining Verification (Tomorrow)}
+\begin{itemize}
+  \item \textbf{Visual confirmation of robot motion}: User did not visually
+    observe the robot moving in Gazebo/RViz despite log evidence of 8.172\,m
+    path. Need to verify with \texttt{ros2 topic echo /odom} that position
+    changes over time. Possible causes: slow Gazebo RTF ($\sim$11\%), camera
+    angle, or an undiagnosed issue.
+  \item \textbf{Full trial completion}: Let the smoke test run to completion
+    without Ctrl+C. At $\sim$11\% RTF, the 60\,s sim-time timeout needs
+    $\sim$9 minutes of wall clock time.
+  \item \textbf{Pedestrian timing}: Pedestrian finishes traversal before robot
+    starts navigating (pedestrian moves in sim time, which elapses even during
+    Nav2 initialization). Consider increasing \texttt{start\_delay} or using a
+    longer pedestrian trajectory.
+  \item \textbf{Automated shutdown}: Add a mechanism so the launch
+    auto-terminates after \texttt{metrics\_logger} writes the CSV (e.g., mark
+    \texttt{metrics\_logger} as a required process, or add a shutdown event
+    handler).
+  \item \textbf{Clean exit}: Verify all Python nodes exit cleanly after
+    \texttt{RuntimeError} catch and \texttt{try/except} shutdown fixes.
+  \item \textbf{SLAM maps for other corridors}: Generate maps for L-turn,
+    T-junction, narrow, wide, and loop corridors.
+\end{itemize}
+
+% ============================================================
 
 \section*{Future Work / Nice-to-Haves}
 \begin{itemize}

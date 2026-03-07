@@ -138,6 +138,20 @@ if(BUILD_TESTING)
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   )
   target_link_libraries(test_safety_shield_cbf safety_shield_cbf)
+
+  ament_add_gtest(test_corridor_frame test/test_corridor_frame.cpp)
+  target_include_directories(test_corridor_frame PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  )
+  ament_target_dependencies(test_corridor_frame nav_msgs geometry_msgs)
+  target_link_libraries(test_corridor_frame corridor_frame)
+
+  ament_add_gtest(test_social_costmap_math test/test_social_costmap_math.cpp)
+  target_include_directories(test_social_costmap_math PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  )
+  ament_target_dependencies(test_social_costmap_math nav_msgs geometry_msgs)
+  target_link_libraries(test_social_costmap_math corridor_frame)
 endif()
 
 ament_package()

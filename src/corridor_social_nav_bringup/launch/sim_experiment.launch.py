@@ -3,16 +3,18 @@ Unified experiment launch file for corridor social navigation trials.
 
 Launches the full stack for a single experiment trial:
   1. Gazebo Ignition Fortress with specified world
-  2. Robot spawn + ros2_control controllers
-  3. ros_gz_bridge (scan, imu, clock, GT pose, pedestrian poses)
-  4. EKF state estimation
-  5. Nav2 with specified controller config
-  6. Safety shield node (if enabled)
-  7. Ground truth people publisher
-  8. Ground truth collision detector
-  9. Pedestrian driver (moves spawned models along trajectories)
-  10. Metrics logger
-  11. Goal sender (triggers navigation + monitors completion)
+     (includes robot spawn, ros2_control, ros_gz_bridge, EKF)
+  2. Spawn pedestrian cylinder models into Gazebo from JSON config
+  3. Nav2 with specified controller config
+  4. Pedestrian pose bridge (Gazebo -> ROS)
+  5. Ground truth people publisher
+  6. Ground truth collision detector
+  7. Pedestrian driver (moves spawned models along trajectories)
+  8. CBF safety shield node (if enabled)
+  9. Metrics logger
+  10. Goal sender (triggers navigation + monitors completion)
+
+Note: EKF is launched inside fortress_bringup.launch.py, NOT here.
 
 All parameters are exposed as launch arguments so the experiment
 runner can configure each trial programmatically.
@@ -40,7 +42,35 @@ from launch.substitutions import (
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
+
+
+def _spawn_pedestrians(context, *args, **kwargs):
+    """Spawn pedestrian cylinder models into Gazebo from JSON config."""
+    ped_json = LaunchConfiguration('pedestrians_json').perform(context)
+    world_name = LaunchConfiguration('world_name').perform(context)
+    rc_share = get_package_share_directory('rc_model_description')
+    model_sdf = os.path.join(rc_share, 'models', 'pedestrian', 'model.sdf')
+
+    peds = json.loads(ped_json)
+    actions = []
+    for ped in peds:
+        pid = ped['id']
+        wp = ped['waypoints']
+        sx, sy = wp[0][0], wp[0][1]
+        sz = ped.get('spawn_z', 0.85)
+        actions.append(ExecuteProcess(
+            cmd=[
+                'ros2', 'run', 'ros_gz_sim', 'create',
+                '-world', world_name,
+                '-file', model_sdf,
+                '-name', f'pedestrian_{pid}',
+                '-x', str(sx), '-y', str(sy), '-z', str(sz),
+            ],
+            output='log',
+        ))
+    return actions
 
 
 def _build_nav2_launch(context, *args, **kwargs):
@@ -118,21 +148,15 @@ def generate_launch_description():
             }.items(),
         ),
 
-        # ── 2. EKF state estimation ──
-        Node(
-            package='robot_localization',
-            executable='ekf_node',
-            name='ekf_filter_node',
-            parameters=[
-                PathJoinSubstitution([rc_pkg, 'config', 'ekf_imu_odom.yaml']),
-                {'use_sim_time': True},
-            ],
-            output='screen',
+        # ── 2. Spawn pedestrian models into Gazebo (after world loads) ──
+        TimerAction(
+            period=5.0,
+            actions=[OpaqueFunction(function=_spawn_pedestrians)],
         ),
 
-        # ── 3. Nav2 (deferred to resolve config path) ──
+        # ── 3. Nav2 (deferred to let Gazebo + controllers start) ──
         TimerAction(
-            period=8.0,
+            period=15.0,
             actions=[OpaqueFunction(function=_build_nav2_launch)],
         ),
 
@@ -177,7 +201,8 @@ def generate_launch_description():
             name='pedestrian_driver',
             parameters=[{
                 'use_sim_time': True,
-                'pedestrians_json': LaunchConfiguration('pedestrians_json'),
+                'pedestrians_json': ParameterValue(
+                    LaunchConfiguration('pedestrians_json'), value_type=str),
                 'world_name': LaunchConfiguration('world_name'),
             }],
             output='log',
@@ -211,7 +236,7 @@ def generate_launch_description():
 
         # ── 10. Goal sender (delayed to let Nav2 initialize) ──
         TimerAction(
-            period=15.0,
+            period=45.0,
             actions=[
                 Node(
                     package='corridor_social_nav_bringup',

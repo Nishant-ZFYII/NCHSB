@@ -142,13 +142,23 @@ def main(args=None):
     node = GtCollisionDetector()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException,
+            RuntimeError):
         pass
     finally:
-        node.get_logger().info(
-            f'Total collisions detected: {node.collision_count}')
-        node.destroy_node()
-        rclpy.shutdown()
+        try:
+            node.get_logger().info(
+                f'Total collisions detected: {node.collision_count}')
+        except Exception:
+            pass
+        try:
+            node.destroy_node()
+        except Exception:
+            pass
+        try:
+            rclpy.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == '__main__':
