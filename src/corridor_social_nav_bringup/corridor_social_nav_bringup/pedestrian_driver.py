@@ -15,12 +15,12 @@ containing a list of {id, speed, start_delay, waypoints} dicts.
 
 import json
 import math
+import subprocess
 import time
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Pose
-from ros_gz_interfaces.srv import SetEntityPose
+from std_msgs.msg import Empty
 
 
 class PedestrianState:
@@ -64,23 +64,33 @@ class PedestrianDriver(Node):
                 spawn_z=cfg.get('spawn_z', 0.85),
             ))
 
-        self.set_pose_client = self.create_client(
-            SetEntityPose,
-            f'/world/{self.world_name}/set_pose'
-        )
+        self._pending_procs = {}
 
+        self.trial_active = False
         self.sim_start_time = None
+
+        self.create_subscription(
+            Empty, '/trial_active', self._on_trial_active, 10)
+
         self.timer = self.create_timer(1.0 / rate, self.update)
 
         self.get_logger().info(
             f'PedestrianDriver: {len(self.pedestrians)} pedestrians, '
-            f'rate={rate}Hz, world={self.world_name}')
+            f'rate={rate}Hz, world={self.world_name}, '
+            f'waiting for /trial_active signal')
+
+    def _on_trial_active(self, msg):
+        if not self.trial_active:
+            self.trial_active = True
+            self.sim_start_time = self.get_clock().now().nanoseconds / 1e9
+            self.get_logger().info(
+                'Received /trial_active -- pedestrians will begin moving')
 
     def update(self):
-        now = self.get_clock().now().nanoseconds / 1e9
-        if self.sim_start_time is None:
-            self.sim_start_time = now
+        if not self.trial_active:
+            return
 
+        now = self.get_clock().now().nanoseconds / 1e9
         elapsed = now - self.sim_start_time
         dt = 1.0 / 20.0  # approximate
 
@@ -124,18 +134,23 @@ class PedestrianDriver(Node):
             self._set_pose(ped.name, ped.x, ped.y, ped.spawn_z)
 
     def _set_pose(self, name: str, x: float, y: float, z: float):
-        if not self.set_pose_client.service_is_ready():
+        prev = self._pending_procs.get(name)
+        if prev is not None and prev.poll() is None:
             return
 
-        req = SetEntityPose.Request()
-        req.entity.name = name
-        req.entity.type = 2  # MODEL
-        req.pose.position.x = x
-        req.pose.position.y = y
-        req.pose.position.z = z
-        req.pose.orientation.w = 1.0
-
-        self.set_pose_client.call_async(req)
+        req = (f'name: "{name}", '
+               f'position: {{x: {x}, y: {y}, z: {z}}}, '
+               f'orientation: {{w: 1.0}}')
+        self._pending_procs[name] = subprocess.Popen(
+            ['ign', 'service',
+             '-s', f'/world/{self.world_name}/set_pose',
+             '--reqtype', 'ignition.msgs.Pose',
+             '--reptype', 'ignition.msgs.Boolean',
+             '--timeout', '200',
+             '--req', req],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
 
 def main(args=None):

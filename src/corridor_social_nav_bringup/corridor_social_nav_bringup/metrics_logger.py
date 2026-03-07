@@ -118,8 +118,14 @@ class MetricsLogger(Node):
             self.time_to_goal = float(parts[1])
 
         self.write_csv()
-        self.get_logger().info('Trial ended, metrics written. Shutting down.')
-        self.create_timer(1.0, lambda: rclpy.shutdown())
+        self.get_logger().info('Trial ended, metrics written. Shutting down in 2s.')
+        self.create_timer(2.0, self._do_shutdown)
+
+    def _do_shutdown(self):
+        try:
+            rclpy.shutdown()
+        except Exception:
+            pass
 
     def write_csv(self):
         shield_pct = 0.0

@@ -2586,6 +2586,279 @@ not needed in automated mode.
 
 % ============================================================
 
+\section*{Day 3: Pedestrian Timing, Inflation, Auto-Shutdown}
+
+\logentry{Session Overview}
+Day 3 focused on completing Priority 1--4: verify robot motion, full trial
+completion, fix pedestrian timing, and add auto-shutdown. All four were
+completed. Additional work: inflation radius tuning for corridor geometry,
+and discussion of lateral offset distribution for stronger experimental design.
+
+% ------------------------------------------------------------------
+
+\subsection*{9.1 Priority 1: Verify Robot Motion}
+
+\logentry{Test}
+User ran smoke test with \texttt{mppi\_vanilla} on \texttt{corridor\_straight}.
+RViz Nav2 panel showed: \texttt{Navigation: active}, \texttt{Localization: active},
+\texttt{Feedback: reached}, \texttt{Distance remaining: 0.00\,m}.
+
+\logentry{Result}
+Robot navigated from spawn (-9, 0) to goal (9, 0) successfully. Odometry samples
+at two time points showed timestamps changing (13\,s $\to$ 18\,s sim-time).
+\textbf{Priority 1 confirmed.}
+
+% ------------------------------------------------------------------
+
+\subsection*{9.2 Priority 2: Full Trial Completion}
+
+\logentry{Result}
+Same run confirmed full trial completion: \texttt{Goal SUCCEEDED in 9.3\,s},
+\texttt{path\_length\_m: 8.635}, \texttt{collision\_count: 0}, CSV written with
+all fields. \textbf{Priority 2 confirmed.}
+
+% ------------------------------------------------------------------
+
+\subsection*{9.3 Priority 3: Fix Pedestrian Timing}
+
+\logentry{Problem}
+Pedestrian cylinder spawned and driver logic ran (logs showed ``pedestrian\_1
+started moving'', ``reached final waypoint''), but the cylinder did \emph{not}
+physically move in Gazebo. User reported: ``I don't see the orange cylinder
+that we kept as a person moving. It is in the same place.''
+
+\logentry{Iteration 1: Signal-Based Timing}
+Added \texttt{/trial\_active} topic: \texttt{goal\_sender} publishes
+\texttt{std\_msgs/Empty} when goal is accepted; \texttt{pedestrian\_driver}
+subscribes and only starts its movement timer after receiving the signal.
+This fixed the timing mismatch (pedestrian used to finish before robot started).
+Logs confirmed: \texttt{Received /trial\_active}, \texttt{pedestrian\_1 started
+moving (delay=1.0s)}. But the cylinder still did not move visually.
+
+\logentry{Iteration 2: Root Cause}
+\texttt{pedestrian\_driver} used \texttt{ros\_gz\_interfaces.srv.SetEntityPose}
+to call \texttt{/world/default/set\_pose}. The \texttt{ros\_gz\_bridge} for
+Humble/Fortress bridges \emph{topics} only, not \emph{services}. The ROS 2
+service client had no server; \texttt{service\_is\_ready()} always returned
+False; \texttt{\_set\_pose()} returned silently every time. The driver's
+internal state advanced (waypoints, ``reached final waypoint'') but no pose
+updates reached Gazebo.
+
+\logentry{Iteration 3: Fix}
+Replaced ROS service call with \texttt{subprocess.Popen} invoking \texttt{ign
+service -s /world/default/set\_pose --reqtype ignition.msgs.Pose --reptype
+ignition.msgs.Boolean --req} with a Pose message (name, position x/y/z).
+Non-blocking: if previous call still
+running, skip (natural rate limiting). No Python Ignition transport bindings
+available; subprocess is the pragmatic solution.
+
+\logentry{Result}
+Pedestrian cylinder now physically moves in Gazebo. User confirmed: ``the bot
+moves and the person moves.'' \textbf{Priority 3 complete.}
+
+% ------------------------------------------------------------------
+
+\subsection*{9.4 Inflation Radius Tuning}
+
+\logentry{User Feedback}
+``The bot is colliding with the person, it needs to stop or either take another
+part right?'' With 0.09\,m inflation, robot plowed through pedestrian
+(\texttt{min\_separation\_m: 0.446}, \texttt{collision\_count: 1}).
+
+\logentry{Geometry Analysis}
+\begin{itemize}
+  \item Corridor: walls at y = $\pm$0.95\,m $\Rightarrow$ usable width 1.9\,m
+  \item Robot footprint: 0.30\,m $\times$ 0.16\,m
+  \item Pedestrian cylinder: diameter 0.50\,m (radius 0.25\,m)
+  \item Current inflation\_radius: 0.09\,m (local), 0.08\,m (global)
+  \item Total keep-away from pedestrian center: 0.25 + 0.09 = 0.34\,m
+  \item Robot needs 0.15 + 0.25 = 0.40\,m to avoid physical contact
+  \item 0.09\,m inflation is too small --- MPPI doesn't ``see'' danger until
+    practically touching
+\end{itemize}
+
+\logentry{User Question}
+``Do we need to have an inflation radius that matches [corridor width minus
+robot width]?'' Discussion: inflation must be large enough for MPPI to react,
+but small enough that a feasible path exists. With 0.55\,m (Nav2 default),
+passable width shrinks to $\sim$0.30\,m --- robot may get stuck.
+
+\logentry{Decision}
+Set \texttt{inflation\_radius: 0.25} in all 5 Nav2 configs (local and global
+costmap). At 0.25\,m, passable width $\sim$0.60\,m --- robot can squeeze past
+comfortably. Fair baseline for paper (reviewers won't cry strawman).
+
+\logentry{Result After 0.25\,m Inflation}
+User: ``the bot actually stopped and the human was the one who came and crashed
+into the bot.'' Metrics: \texttt{collision\_count: 1}, \texttt{min\_separation\_m:
+0.394}, \texttt{stuck\_time\_s: 11.25}. Robot saw inflated pedestrian, stopped,
+waited; pedestrian walked into stationary robot. This is the expected vanilla
+baseline --- perfect for paper comparison.
+
+% ------------------------------------------------------------------
+
+\subsection*{9.5 Lateral Offset Distribution (Discussion)}
+
+\logentry{User Feedback}
+``The corridor is about x\,m wide, the bot is about y\,m. Humans will walk along
+(x-y), and they will only have this space. Is there enough distance for the bot
+to change track? Both are moving in the centre. Which will be a stronger study:
+if both in the centre, or if both in the side? Like 2 humans walking in the
+corridor, both are not walking in the centre, one keeps to the left lane and
+the other to the right lane, but this should not be hardcoded coz movement in
+corridors can be unpredictable.''
+
+\logentry{Response}
+\begin{itemize}
+  \item 18\,m corridor gives $\sim$9\,s before encounter --- plenty of time.
+  \item Current \texttt{lateral\_offset: mean: 0.15} puts pedestrian near center.
+  \item Real humans keep $\sim$0.3--0.5\,m from wall (``lane'' behavior).
+  \item Suggested: \texttt{mean: 0.35, std: 0.15, min: -0.1, max: 0.7} for
+    realistic distribution across trials.
+  \item Stronger study: range of difficulties (head-on center vs own lane).
+  \item Not implemented yet --- user said ``let us test this'' (Priority 4).
+\end{itemize}
+
+% ------------------------------------------------------------------
+
+\subsection*{9.6 Priority 4: Auto-Shutdown}
+
+\logentry{Implementation (Iteration 1)}
+Added \texttt{on\_exit=Shutdown(reason='Trial complete -- metrics written')}
+to the \texttt{metrics\_logger} Node. When \texttt{metrics\_logger} exits, the
+Shutdown action runs and launch sends SIGINT to all processes.
+
+\logentry{User Feedback}
+``It did not close automatically.'' Log analysis: shutdown \emph{did} trigger
+(\texttt{process[metrics\_logger-13] was required: shutting down launched
+system}), but \texttt{Caught exception: Cannot shutdown a ROS adapter that is
+not running} occurred. Launch may have hung or not returned to shell prompt.
+
+\logentry{Implementation (Iteration 2) --- Failed}
+Tried \texttt{required=True} on the Node. Error: \texttt{TypeError:
+Action.\_\_init\_\_() got an unexpected keyword argument 'required'}.
+The \texttt{Node} action in ROS 2 Humble does not support \texttt{required}.
+Reverted to \texttt{on\_exit=Shutdown()}.
+
+\logentry{User Feedback (Final)}
+``I waited for some time, the Gazebo and RViz did not shut down, so I killed
+using Ctrl+C.'' Logs show shutdown \emph{did} trigger (child processes received
+SIGINT, Nav2 escalated to SIGKILL), but the launch process itself did not
+return to the shell prompt. Gazebo and RViz windows remained open. The
+\texttt{Cannot shutdown a ROS adapter that is not running} exception may be
+preventing the launch process from exiting cleanly. \textbf{Auto-shutdown
+remains unreliable} --- user must Ctrl+C for now. Future: investigate launch
+teardown or use \texttt{run\_experiment.py} subprocess kill for automated runs.
+
+\logentry{Code Changes}
+\begin{itemize}
+  \item \texttt{sim\_experiment.launch.py}: \texttt{on\_exit=Shutdown(...)} on
+    \texttt{metrics\_logger} Node.
+  \item \texttt{metrics\_logger.py}: Shutdown delay 2\,s, \texttt{\_do\_shutdown()}
+    helper.
+\end{itemize}
+
+\logentry{User Command Error}
+User copy-pasted instruction text into the shell command:
+\begin{verbatim}
+... 'pedestrians_json:=[...]' Watch for the log line Trial complete ...
+> ~/Downloads/ROS2_errors/auto_shutdown_log1.txt
+\end{verbatim}
+Error: \texttt{malformed launch argument ' '}, \texttt{Command 'Watch' not found}.
+Cause: instruction text was part of the command. Correct: run only the
+\texttt{ros2 launch ...} part; to save to file use \texttt{2>\&1 | tee ~/path/to/file.txt}.
+
+% ------------------------------------------------------------------
+
+\subsection*{9.7 LiDAR and Inflation Layer Observations}
+
+\logentry{User Feedback}
+``I see a red lidar line coming. But the inflation radius for that lidar line
+for the cylinder starts late, and the line is kind of like multiple lines. The
+screenshot was taken before the collision. Isn't it like the inflation radius
+starts when a lidar point is detected?''
+
+\logentry{Analysis}
+\begin{itemize}
+  \item \textbf{Red lidar line}: The pedestrian cylinder is detected by the
+    LiDAR; red points mark the obstacle layer in the costmap.
+  \item \textbf{Multiple lines}: The pedestrian \emph{moves} between scans. Each
+    scan captures it at a slightly different position. The obstacle layer
+    accumulates marks; \texttt{clearing: true} raytraces through old marks, but
+    lateral motion leaves ``ghost'' positions for a few cycles. Result: smeared,
+    segmented red pattern.
+  \item \textbf{Inflation starts late}: Inflation is applied \emph{after} the
+    obstacle layer marks a cell. With 0.25\,m inflation, the danger zone from
+    pedestrian center is 0.50\,m total. The robot doesn't see significant cost
+    until the pedestrian is close. MPPI has limited time to plan an evasive
+    maneuver (Ackermann can't turn sharply).
+  \item \textbf{Yes --- inflation starts when a lidar point is detected}: The
+    obstacle layer marks cells where LiDAR rays hit. The inflation layer then
+    expands cost outward from those marks. No prediction --- vanilla Nav2
+    reacts only to \emph{current} detections. Social costmap layers add
+    \emph{predicted} pedestrian positions, inflating cost ahead of the person.
+\end{itemize}
+
+\logentry{Metrics (auto\_shutdown\_log2)}
+\texttt{collision\_count: 1}, \texttt{min\_separation\_m: 0.344},
+\texttt{stuck\_time\_s: 10.39}. Robot stopped, pedestrian walked into it.
+Same baseline behavior as before.
+
+\logentry{Screenshots (Before Collision)}
+Six RViz screenshots showing the progression: red lidar points along walls and
+around the pedestrian cylinder, pink/purple inflation layers, robot approaching.
+The ``multiple lines'' and ``inflation starts late'' are visible.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.48\textwidth]{day3_lidar_inflation_01.png}
+  \includegraphics[width=0.48\textwidth]{day3_lidar_inflation_02.png}
+  \caption{Day 3: LiDAR and inflation (1--2). Red points = obstacle layer,
+    pink/purple = inflation. Pedestrian cylinder ahead of robot.}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.48\textwidth]{day3_lidar_inflation_03.png}
+  \includegraphics[width=0.48\textwidth]{day3_lidar_inflation_04.png}
+  \caption{Day 3: LiDAR and inflation (3--4). Multiple red lines from moving
+    pedestrian; inflation zone around cylinder.}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.48\textwidth]{day3_lidar_inflation_05.png}
+  \includegraphics[width=0.48\textwidth]{day3_lidar_inflation_06.png}
+  \caption{Day 3: LiDAR and inflation (5--6). Robot very close to inflation
+    zone; screenshot before collision.}
+\end{figure}
+
+% ------------------------------------------------------------------
+
+\subsection*{9.8 Day 3 Summary}
+
+\logentry{Completed}
+\begin{itemize}
+  \item Priority 1: Robot motion verified (RViz ``reached'', odom confirms)
+  \item Priority 2: Full trial completion (goal succeeded, CSV written)
+  \item Priority 3: Pedestrian timing (signal-based) + physical movement
+    (subprocess \texttt{ign service} instead of unbridged ROS service)
+  \item Inflation radius: 0.09/0.08 $\to$ 0.25\,m in all 5 Nav2 configs
+  \item Priority 4: Auto-shutdown implemented (on\_exit=Shutdown) --- but
+    \textbf{unreliable}: Gazebo/RViz did not close; user had to Ctrl+C
+\end{itemize}
+
+\logentry{Remaining}
+\begin{itemize}
+  \item Priority 6: Smoke test all 4 controller configs (vanilla, social\_instant,
+    social\_pred, full)
+  \item Lateral offset distribution update (mean 0.35) --- not yet applied
+  \item Fix auto-shutdown: launch process does not return to shell; investigate
+    \texttt{Cannot shutdown a ROS adapter} exception
+\end{itemize}
+
+% ============================================================
+
 \section*{Future Work / Nice-to-Haves}
 \begin{itemize}
   \item \textbf{AWS RoboMaker Hospital World for visual fidelity}: The \texttt{aws-robomaker-hospital-world} (GitHub: \texttt{aws-robotics/aws-robomaker-hospital-world}) provides a detailed hospital environment with corridors, rooms, furniture, and human models. However:

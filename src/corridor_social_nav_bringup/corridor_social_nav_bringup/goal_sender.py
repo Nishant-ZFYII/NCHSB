@@ -19,7 +19,7 @@ from rclpy.duration import Duration
 
 from geometry_msgs.msg import PoseStamped
 from nav2_msgs.action import NavigateToPose
-from std_msgs.msg import String
+from std_msgs.msg import Empty, String
 
 
 class GoalSender(Node):
@@ -40,6 +40,7 @@ class GoalSender(Node):
         self.timeout_s = self.get_parameter('timeout_s').value
 
         self.result_pub = self.create_publisher(String, '/trial_result', 10)
+        self.active_pub = self.create_publisher(Empty, '/trial_active', 10)
 
         self.action_client = ActionClient(
             self, NavigateToPose, 'navigate_to_pose')
@@ -113,6 +114,8 @@ class GoalSender(Node):
             return
 
         self.get_logger().info('Goal accepted')
+        self.active_pub.publish(Empty())
+        self.get_logger().info('Published /trial_active signal')
         result_future = goal_handle.get_result_async()
         result_future.add_done_callback(self.result_cb)
 

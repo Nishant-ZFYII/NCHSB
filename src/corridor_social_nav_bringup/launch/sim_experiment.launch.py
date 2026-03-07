@@ -33,6 +33,7 @@ from launch.actions import (
     TimerAction,
     ExecuteProcess,
     OpaqueFunction,
+    Shutdown,
 )
 from launch.conditions import IfCondition
 from launch.substitutions import (
@@ -219,6 +220,9 @@ def generate_launch_description():
         ),
 
         # ── 9. Metrics logger ──
+        # on_exit=Shutdown: when metrics_logger exits (after writing CSV),
+        # launch shuts down all processes. No manual Ctrl+C needed.
+        # The "Cannot shutdown a ROS adapter" error on exit is cosmetic.
         Node(
             package='corridor_social_nav_bringup',
             executable='metrics_logger',
@@ -232,6 +236,7 @@ def generate_launch_description():
                 'timeout_s': LaunchConfiguration('timeout_s'),
             }],
             output='screen',
+            on_exit=Shutdown(reason='Trial complete -- metrics written'),
         ),
 
         # ── 10. Goal sender (delayed to let Nav2 initialize) ──
