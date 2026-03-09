@@ -188,8 +188,51 @@ RViz2 should auto-launch. Add two Image displays:
 
 **Pass/Fail Criteria:**
 - [ ] All 5 camera+scan topics appear in `ros2 topic list`
-- [ ] `/camera/depth` publishes at ~15 Hz
+- [ ] `/camera/depth` publishes at ~10 Hz
 - [ ] `/scan` still publishes at ~25 Hz
 - [ ] RGB image shows the corridor in RViz2
 - [ ] Depth image shows corridor geometry in RViz2
 - [ ] Robot spawns and is visible in Gazebo GUI
+
+### Error: RGBD Camera Blocks Gazebo Initialization (2026-03-09)
+
+**Symptom:** After adding the RGBD camera, launching Gazebo caused:
+1. Entity creation timed out (`Request to create entity from service [/world/default/create] timed out..`)
+2. gz_ros2_control never initialized (no controller_manager output)
+3. Both controller spawners failed: `Could not contact service /controller_manager/list_controllers`
+4. Robot spawned but had no steering/drive (controllers dead)
+
+**Root Cause:** Dual-GPU system (Intel UHD 630 + NVIDIA GTX 1060 Mobile). Gazebo's ogre2 renderer was trying to create the RGBD camera's EGL rendering context on the **Intel iGPU**, which fails with `libEGL warning: egl: failed to create dri2 screen`. The gpu_lidar was less demanding and worked anyway, but the full RGBD camera blocked the initialization pipeline, preventing gz_ros2_control from loading.
+
+**Evidence:**
+- `/dev/dri/renderD128` = Intel UHD 630 (pci-0000:00:02.0)
+- `/dev/dri/renderD129` = NVIDIA GTX 1060 (pci-0000:01:00.0)
+- `libEGL warning: egl: failed to create dri2 screen` in old logs (x4)
+- Without camera: controller_manager loaded in ~3s after entity creation
+- With camera: controller_manager never loaded (30s timeout exceeded)
+
+**Fixes Applied:**
+
+1. **Force NVIDIA GPU rendering** (fortress_bringup.launch.py):
+   - Added `__NV_PRIME_RENDER_OFFLOAD=1` environment variable
+   - Added `__GLX_VENDOR_LIBRARY_NAME=nvidia` environment variable
+   - Added `__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json`
+
+2. **Reduced camera rendering demands** (links.xacro):
+   - Resolution: 640x480 → 320x240 (4x fewer pixels to render)
+   - Update rate: 15 Hz → 10 Hz
+   - `<visualize>false</visualize>` (removes visualization overlay)
+
+3. **Increased controller spawner timeouts** (fortress_bringup.launch.py):
+   - Spawn delay: 2s → 5s (give Gazebo time to load rendering)
+   - JSB spawner delay: 8s → 25s (wait for gz_ros2_control)
+   - Ackermann spawner delay: 10s → 30s
+   - Controller manager timeout: 30s → 120s
+
+**If the fix still doesn't work, try in terminal before launching:**
+```bash
+export __NV_PRIME_RENDER_OFFLOAD=1
+export __GLX_VENDOR_LIBRARY_NAME=nvidia
+export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
+export DRI_PRIME=1
+```

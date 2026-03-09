@@ -242,12 +242,12 @@
       <sensor name="rgbd_camera" type="rgbd_camera">
         <pose>0 0 0 0 0 0</pose>
         <topic>camera</topic>
-        <update_rate>15</update_rate>
+        <update_rate>10</update_rate>
         <camera>
           <horizontal_fov>1.047</horizontal_fov>
           <image>
-            <width>640</width>
-            <height>480</height>
+            <width>320</width>
+            <height>240</height>
           </image>
           <clip>
             <near>0.1</near>
@@ -255,7 +255,7 @@
           </clip>
         </camera>
         <always_on>true</always_on>
-        <visualize>true</visualize>
+        <visualize>false</visualize>
         <gz_frame_id>camera_color_optical_frame</gz_frame_id>
       </sensor>
     </gazebo>

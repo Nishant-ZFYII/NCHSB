@@ -70,7 +70,7 @@ def _prepare_and_spawn(context, *args, **kwargs):
         executable="spawner",
         arguments=["joint_state_broadcaster",
                    "--controller-manager", controller_mgr_ns,
-                   "--controller-manager-timeout", "30"],
+                   "--controller-manager-timeout", "120"],
         output="screen",
     )
 
@@ -80,7 +80,7 @@ def _prepare_and_spawn(context, *args, **kwargs):
         arguments=["ackermann_steering_controller",
                    "--controller-manager", controller_mgr_ns,
                    "--param-file", controllers_yaml_path,
-                   "--controller-manager-timeout", "30"],
+                   "--controller-manager-timeout", "120"],
         output="screen",
     )
 
@@ -101,9 +101,9 @@ def _prepare_and_spawn(context, *args, **kwargs):
     '''
     # After defining `spawn`, `joint_state_broadcaster_spawner`, `ackermann_steering_spawner`:
 
-    spawn_robot = TimerAction(period=2.0, actions=[spawn])
-    spawn_jsb   = TimerAction(period=8.0, actions=[joint_state_broadcaster_spawner])
-    spawn_ack   = TimerAction(period=10.0, actions=[ackermann_steering_spawner])
+    spawn_robot = TimerAction(period=5.0, actions=[spawn])
+    spawn_jsb   = TimerAction(period=25.0, actions=[joint_state_broadcaster_spawner])
+    spawn_ack   = TimerAction(period=30.0, actions=[ackermann_steering_spawner])
 
     return [rsp, spawn_robot, spawn_jsb, spawn_ack, rviz]
 
@@ -132,6 +132,15 @@ def generate_launch_description():
                          description='Spawn X (m)')
     spawn_yaw      = DeclareLaunchArgument('spawn_yaw', default_value='-1.5078',
                          description='Spawn yaw (rad)')
+    # Force NVIDIA GPU for Gazebo rendering (dual-GPU system: Intel iGPU + NVIDIA dGPU)
+    # Without this, Gazebo ogre2 may try Intel's EGL/DRI2 which fails for camera sensors
+    set_prime  = SetEnvironmentVariable(name='__NV_PRIME_RENDER_OFFLOAD', value='1')
+    set_glx    = SetEnvironmentVariable(name='__GLX_VENDOR_LIBRARY_NAME', value='nvidia')
+    set_egl    = SetEnvironmentVariable(
+        name='__EGL_VENDOR_LIBRARY_FILENAMES',
+        value='/usr/share/glvnd/egl_vendor.d/10_nvidia.json'
+    )
+
     # Resource paths (models & worlds)
     set_gz_res  = SetEnvironmentVariable(
         name='GZ_SIM_RESOURCE_PATH',
@@ -276,6 +285,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         world_file, world_name, model_name, use_sim_time, spawn_z, spawn_x, spawn_y, spawn_yaw,
+        set_prime, set_glx, set_egl,
         set_gz_res, set_ign_res, set_hospital_models, set_hospital_ign, controllers_yaml,
         gz_launch,
         OpaqueFunction(function=_prepare_and_spawn),
