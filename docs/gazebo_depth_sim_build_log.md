@@ -605,3 +605,39 @@ ros2 launch rc_model_description fortress_bringup.launch.py \
 # Switch profile at runtime:
 ros2 param set /depth_error_injector profile 3
 ```
+
+---
+
+## Phase 3: Nav2 Depth Experiment Wiring (2026-03-09)
+
+### Goal
+
+Wire the depth error injection pipeline into Nav2 so the injected depth actually drives the costmap and navigation decisions. Create a complete experiment launch file for automated trials.
+
+### Pipeline
+
+```
+Gazebo GT depth ──→ depth_error_injector ──→ da3_to_pointcloud ──→ Nav2 ObstacleLayer
+/camera/depth         /camera/depth_injected    /depth/pointcloud     local_costmap
+                            ↑ profile (0-9)
+```
+
+### Files Created/Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `config/nav2_mppi_depth_sim.yaml` | **Created** | Based on `nav2_mppi_vanilla.yaml`. Adds `depth_pc` observation source (PointCloud2 from `/depth/pointcloud`) to the local costmap obstacle layer alongside LiDAR. Depth marks obstacles but does not clear (LiDAR handles clearing). |
+| `launch/sim_depth_experiment.launch.py` | **Created** | Complete experiment launch: (1) fortress_bringup with cameras + injector, (2) da3_to_pointcloud converting injected depth to PointCloud2, (3) Nav2 with patched AMCL initial pose, (4) metrics_logger, (5) goal_sender. Delays: Nav2 at +35s, goal at +55s. |
+| `rviz/urdf.rviz` | **Modified** | Added PointCloud2 display for `/depth/pointcloud` to visualize depth-derived obstacles. |
+
+### Key Design Decisions
+
+1. **Depth marking only, no clearing:** `depth_pc` in the obstacle layer uses `clearing: false, marking: true`. This means depth can add obstacles to the costmap but never remove them. LiDAR handles clearing. Rationale: noisy depth (V5/V8 with RMSE >2m) clearing could erroneously remove real obstacles.
+
+2. **da3_to_pointcloud params:** `min_depth=0.3m`, `max_depth=5.0m`, height band `0.05-0.50m` above ground, `camera_height=0.08m` (sim camera mount), `downsample=2` (160x120 effective resolution for PointCloud2). Output frame: `camera_depth_optical_frame`.
+
+3. **Reuse existing nodes:** `da3_to_pointcloud.py` from `rc_hardware_bringup` (already built), `goal_sender` and `metrics_logger` from `corridor_social_nav_bringup`. No pedestrian nodes needed.
+
+4. **Timing:** Nav2 starts at +35s (after Gazebo, robot, controllers are up). Goal sender at +55s (after Nav2 lifecycle activation + AMCL convergence).
+
+5. **Auto-map resolution:** Launch file auto-derives the map YAML from the world file name (e.g., `corridor_narrow.sdf` → `maps/corridor_narrow.yaml`).

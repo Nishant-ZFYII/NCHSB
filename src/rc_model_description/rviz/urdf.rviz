@@ -111,6 +111,17 @@ Visualization Manager:
       Min Value: 0
       Normalize Range: true
 
+    - Class: rviz_default_plugins/PointCloud2
+      Name: DepthPointCloud
+      Enabled: true
+      Topic:
+        Value: /depth/pointcloud
+      Size (Pixels): 3
+      Style: Points
+      Color Transformer: AxisColor
+      Axis: Z
+      Alpha: 1
+
   Global Options:
     Fixed Frame: map
   Tools:
