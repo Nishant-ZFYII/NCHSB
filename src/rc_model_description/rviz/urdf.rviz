@@ -112,7 +112,7 @@ Visualization Manager:
       Normalize Range: true
 
   Global Options:
-    Fixed Frame: odom
+    Fixed Frame: map
   Tools:
     - Class: rviz_default_plugins/Interact
     - Class: rviz_default_plugins/MoveCamera

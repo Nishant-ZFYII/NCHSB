@@ -282,6 +282,18 @@ def generate_launch_description():
         output='screen',
         parameters=[ekf_config, {'use_sim_time': True}],
     )
+
+    # Static map -> odom transform (identity).
+    # In sim the odom frame aligns with the world origin, so map=odom.
+    # Replace with AMCL when full Nav2 localization is needed (Phase 3).
+    map_odom_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='map_odom_static_tf',
+        output='screen',
+        arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
+        parameters=[{'use_sim_time': True}],
+    )
     '''
     gt_tf_bridge = Node(
     package='ros_gz_bridge',
@@ -330,6 +342,7 @@ def generate_launch_description():
         clock_bridge,
         gt_pose_bridge,
         ekf_node,
+        map_odom_tf,
         #world_odom_aligner,
         #gt_tf_bridge
     ])
