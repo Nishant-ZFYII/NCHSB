@@ -708,3 +708,20 @@ Add furniture, a glass panel, and a reflective floor patch to the corridor world
 2. **Same SLAM map**: Furniture objects are detected at runtime by the obstacle layer, not baked into the static map. AMCL localizes from wall features which are unchanged.
 3. **Scale-appropriate**: The RC car corridor has 0.5m walls and 1.5-2.0m width. Furniture is sized proportionally (~0.15-0.30m objects).
 4. **Clearance maintained**: Every object leaves ≥0.5m clearance for the robot to navigate around.
+
+### Checkpoint 4 Results (2026-03-09)
+
+| Check | Status |
+|-------|--------|
+| Chair visible (brown, x=-4) | PASS |
+| Hospital cart visible (white/blue, x=1.5) | PASS |
+| Glass panel visible (translucent, x=-0.5) | PASS |
+| Reflective floor patch (shiny, right section) | PASS |
+| Robot spawns correctly | PASS |
+| LiDAR still works | PASS |
+
+### Commits (Phase 4)
+
+| Hash | Message |
+|------|---------|
+| `a61e9e4` | Phase 4: Add furnished corridor world with glass + reflective floor |
