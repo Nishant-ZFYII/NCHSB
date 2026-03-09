@@ -348,12 +348,167 @@ ros2 launch rc_model_description fortress_bringup.launch.py \
 - All 16 controller_manager services available
 - joint_state_broadcaster + ackermann_steering_controller active
 
-### Camera sensors working (2026-03-09)
+### Camera sensors: Bridge topic name mismatch (2026-03-09)
 
-After fixing the bridge topic names (Fortress publishes on `/camera_color` and `/camera_depth`, not `/camera_color/image` or `/camera_depth/depth_image`), camera sensors produce data:
-- `/camera/color/image_raw`: ~2Hz (320x240 RGB)
-- `/camera/depth`: ~3Hz (320x240 depth)
+**Problem:** After enabling cameras (`enable_cameras:=true`), the RGB and depth topics were not publishing. Controllers loaded fine (gz_ros2_control not blocked), but `/camera/color/image_raw` and `/camera/depth` had no data.
 
-Rates are below configured 10Hz due to `LIBGL_ALWAYS_SOFTWARE=1` (CPU-based software rendering via llvmpipe). Hardware rendering may give higher rates but software rendering avoids dual-GPU deadlocks. Sufficient for depth error injection experiments.
+**Diagnosis:**
+```bash
+ign topic -l | grep camera
+# Output:
+# /camera_color          ← actual topic (NOT /camera_color/image)
+# /camera_depth          ← actual topic (NOT /camera_depth/depth_image)
+# /camera_depth/points
+# /camera_info
 
-**Checkpoint 1 fully complete:** Robot + LiDAR + IMU + cameras all functional.
+ign topic -e -t /camera_color --num 1   # → prints data (working!)
+ign topic -e -t /camera_depth --num 1   # → prints data (working!)
+```
+
+**Root cause:** Gazebo Ignition Fortress publishes sensor data on the base `<topic>` name directly, NOT with `/image` or `/depth_image` suffixes. Our bridge was listening to non-existent topics.
+
+| Sensor | Actual Gazebo Topic | Bridge Was Listening To |
+|--------|-------------------|----------------------|
+| RGB | `/camera_color` | `/camera_color/image` |
+| Depth | `/camera_depth` | `/camera_depth/depth_image` |
+| Camera Info | `/camera_info` | `/camera_color/camera_info` |
+
+**Fix:** Updated `fortress_bringup.launch.py` bridge arguments:
+```python
+# camera_color_bridge: /camera_color → /camera/color/image_raw
+# camera_depth_bridge: /camera_depth → /camera/depth
+# camera_info: /camera_info → /camera/color/camera_info
+```
+
+**Result:** Both topics now publish:
+- `/camera/color/image_raw`: ~2Hz (320x240 RGB, encoding: `rgb8`)
+- `/camera/depth`: ~3Hz (320x240 depth, encoding: `32FC1`)
+
+**Note on LIBGL_ALWAYS_SOFTWARE:** The `IfCondition` sets this when `enable_cameras:=true`, but the NVIDIA driver **rejects it**: `libEGL warning: Not allowed to force software rendering when API explicitly selects a hardware device.` The cameras use hardware rendering regardless. The env var is harmless but ineffective on this system.
+
+**Commit:** `38c50e2` "Fix: Correct camera bridge topic names for Fortress"
+
+### RViz TF tree fix (2026-03-09)
+
+**Problem:** RViz showed "Global Status: Error" because the fixed frame was set to `map` but no `map` frame existed in the TF tree. The TF chain was broken at `map → odom`.
+
+**Reference:** This exact issue is documented in `NCHSB/build_logs.tex` (lines 2030-2106) from the original corridor-social-nav development. The expected TF chain is:
+```
+map → odom → base_link → chassis_link → lidar_link
+ |      |          |
+AMCL   EKF    robot_state_publisher (static)
+```
+
+Without Nav2/AMCL running, the `map → odom` link is missing.
+
+**Fix:** Added a `static_transform_publisher` node to `fortress_bringup.launch.py`:
+```python
+map_odom_tf = Node(
+    package='tf2_ros',
+    executable='static_transform_publisher',
+    name='map_odom_static_tf',
+    arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
+    parameters=[{'use_sim_time': True}],
+)
+```
+
+This publishes an identity transform `map = odom`. In simulation, the odom frame aligns with the world origin, so this is correct. Will be replaced with AMCL in Phase 3 for proper localization.
+
+Also restored RViz fixed frame to `map` and added RGB Camera + Depth Camera Image displays to `urdf.rviz`.
+
+**Result:** RViz Global Status Error resolved. Full TF chain working:
+```
+map → odom → base_link → chassis_link → lidar_link
+                                      → camera_link → camera_color_optical_frame
+                                                    → camera_depth_optical_frame
+```
+
+**Commit:** `a23eaaa` "Fix: Add static map->odom TF, restore RViz fixed frame to map"
+
+### Depth camera: RViz shows black (visualization issue only) (2026-03-09)
+
+**Problem:** RGB Camera panel in RViz shows the corridor correctly. Depth Camera panel shows solid black.
+
+**Diagnosis:**
+```bash
+python3 -c "... depth pixel check ..."
+# Output:
+# Size: 320x240 = 76800 pixels
+# Valid (0-100m): 48413
+# NaN: 0, Inf: 28387, Zero: 0
+# Range: 0.320m - 8.496m, Mean: 1.395m
+```
+
+**Root cause:** The depth sensor publishes `32FC1` (float32 single-channel) images. 63% of pixels have valid depth (0.32-8.5m), 37% are `inf` (beyond far clip). RViz's Image display cannot normalize a range that includes `inf` values -- the normalization computes `(value - min) / (max - min)` where `max = inf`, so all finite values map to 0 (black).
+
+**Workaround:** Use `rqt_image_view` which handles float depth images correctly:
+```bash
+ros2 run rqt_image_view rqt_image_view /camera/depth
+```
+This shows the depth image properly with auto-normalization that ignores `inf` values.
+
+**Impact on project:** None. The depth error injection experiment reads float32 values directly in Python, not through RViz. The raw depth data (0.32-8.5m, 63% valid) is exactly what we need. The RViz black panel is cosmetic only.
+
+---
+
+## Phase 1 Status: COMPLETE
+
+### Final System Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Gazebo Version | Ignition Fortress v6.16.0 |
+| GPU | NVIDIA GTX 1060 (driver 580.126.09) |
+| Robot Spawn | `spawn_x:=-6.5 spawn_y:=0.0 spawn_z:=0.12` |
+| World | `corridor_narrow.sdf` |
+| Camera Resolution | 320x240 |
+| Camera Update Rate | 10Hz configured, ~2-3Hz actual |
+| `enable_cameras` | `false` (default), `true` for camera data |
+| `gui` | `true` (default), `false` for headless |
+
+### Sensor Status
+
+| Sensor | ROS Topic | Rate | Encoding | Status |
+|--------|-----------|------|----------|--------|
+| LiDAR | `/scan` | 25Hz | LaserScan | Working |
+| IMU | `/imu` | ~100Hz | Imu | Working |
+| RGB Camera | `/camera/color/image_raw` | ~2Hz | rgb8 | Working (visible in RViz + rqt) |
+| Depth Camera | `/camera/depth` | ~3Hz | 32FC1 | Working (valid data, RViz display cosmetic issue) |
+| Odometry | `/odom` | ~100Hz | Odometry | Working |
+| Clock | `/clock` | ~1kHz | Clock | Working |
+
+### TF Tree
+
+```
+map → odom → base_link → chassis_link → lidar_link
+(static)  (EKF)   (rsp)           → camera_link → camera_color_optical_frame
+                                                 → camera_depth_optical_frame
+                                   → suspension_axle → imu_link
+                                                     → front_assembly → ...wheels
+                                   → left_motor → back_left_wheel
+                                   → right_motor → back_right_wheel
+```
+
+### Key Lessons from Phase 1
+
+1. **Leaked GPU contexts:** Multiple crashed Gazebo Ignition sessions on dual-GPU systems leak rendering contexts that persist until reboot. Always reboot after Gazebo crashes.
+2. **Fortress topic naming:** Sensors publish on `<topic>` directly, not `<topic>/image` or `<topic>/depth_image`. Check with `ign topic -l` to verify.
+3. **LIBGL_ALWAYS_SOFTWARE:** NVIDIA drivers reject this env var (`Not allowed to force software rendering when API explicitly selects a hardware device`). Cameras use hardware rendering regardless.
+4. **32FC1 depth in RViz:** RViz Image display cannot handle `inf` values in float depth. Use `rqt_image_view` for visualization.
+5. **Camera toggle:** The `enable_cameras` xacro arg is essential -- cameras add rendering load and can cause issues. Keep disabled when not needed.
+
+### Commits (Phase 1)
+
+| Hash | Message |
+|------|---------|
+| `15f5f10` | Fix: Split rgbd_camera into separate camera + depth_camera sensors |
+| `2aeceda` | Fix: Add enable_cameras toggle + software rendering for dual-GPU systems |
+| `ec39321` | Fix: Only set LIBGL_ALWAYS_SOFTWARE when cameras enabled, restore gui=true |
+| `e7d8bd6` | Update build log with fix 4 failure analysis and fix 5 |
+| `4040c3d` | Checkpoint 1 passed: Gazebo sim fully functional after GPU state fix |
+| `38c50e2` | Fix: Correct camera bridge topic names for Fortress |
+| `5698526` | Checkpoint 1 fully complete: cameras publishing RGB + depth |
+| `6a4a8e6` | Fix: RViz fixed frame odom (not map), add camera image displays |
+| `a23eaaa` | Fix: Add static map->odom TF, restore RViz fixed frame to map |
+
+### Ready for Phase 2: Depth Error Injector
