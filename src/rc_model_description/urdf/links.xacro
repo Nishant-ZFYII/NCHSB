@@ -238,12 +238,37 @@
     <link name="camera_color_optical_frame"/>
     <link name="camera_depth_optical_frame"/>
 
+    <!-- Separate camera + depth_camera instead of rgbd_camera.
+         The rgbd_camera type hangs Gazebo Fortress on dual-GPU systems
+         during rendering init. Separate sensors have independent, lighter
+         init paths. Pattern from github.com/acceleration-robotics/ros2-igt -->
     <gazebo reference="camera_link">
-      <sensor name="rgbd_camera" type="rgbd_camera">
+      <sensor name="camera_color" type="camera">
         <pose>0 0 0 0 0 0</pose>
-        <topic>camera</topic>
+        <topic>camera_color</topic>
         <update_rate>10</update_rate>
-        <camera>
+        <camera name="camera_color">
+          <horizontal_fov>1.047</horizontal_fov>
+          <image>
+            <width>320</width>
+            <height>240</height>
+            <format>RGB_INT8</format>
+          </image>
+          <clip>
+            <near>0.1</near>
+            <far>10.0</far>
+          </clip>
+        </camera>
+        <always_on>true</always_on>
+        <visualize>false</visualize>
+        <gz_frame_id>camera_color_optical_frame</gz_frame_id>
+      </sensor>
+
+      <sensor name="camera_depth" type="depth_camera">
+        <pose>0 0 0 0 0 0</pose>
+        <topic>camera_depth</topic>
+        <update_rate>10</update_rate>
+        <camera name="camera_depth">
           <horizontal_fov>1.047</horizontal_fov>
           <image>
             <width>320</width>
@@ -256,7 +281,7 @@
         </camera>
         <always_on>true</always_on>
         <visualize>false</visualize>
-        <gz_frame_id>camera_color_optical_frame</gz_frame_id>
+        <gz_frame_id>camera_depth_optical_frame</gz_frame_id>
       </sensor>
     </gazebo>
 

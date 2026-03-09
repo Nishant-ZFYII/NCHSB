@@ -206,20 +206,33 @@ def generate_launch_description():
         output='screen'
     )
 
-    camera_bridge = Node(
+    camera_color_bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
-        name='camera_bridge',
+        name='camera_color_bridge',
         output='screen',
         arguments=[
-            '/camera/image@sensor_msgs/msg/Image[gz.msgs.Image',
-            '/camera/depth_image@sensor_msgs/msg/Image[gz.msgs.Image',
-            '/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+            '/camera_color/image@sensor_msgs/msg/Image[gz.msgs.Image',
+            '/camera_color/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
         ],
         remappings=[
-            ('/camera/image', '/camera/color/image_raw'),
-            ('/camera/depth_image', '/camera/depth'),
-            ('/camera/camera_info', '/camera/color/camera_info'),
+            ('/camera_color/image', '/camera/color/image_raw'),
+            ('/camera_color/camera_info', '/camera/color/camera_info'),
+        ],
+    )
+
+    camera_depth_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        name='camera_depth_bridge',
+        output='screen',
+        arguments=[
+            '/camera_depth/depth_image@sensor_msgs/msg/Image[gz.msgs.Image',
+            '/camera_depth/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+        ],
+        remappings=[
+            ('/camera_depth/depth_image', '/camera/depth'),
+            ('/camera_depth/camera_info', '/camera/depth/camera_info'),
         ],
     )
 
@@ -308,7 +321,8 @@ def generate_launch_description():
         gz_launch_gui,
         OpaqueFunction(function=_prepare_and_spawn),
         scan_bridge,
-        camera_bridge,
+        camera_color_bridge,
+        camera_depth_bridge,
         imu_bridge,
         clock_bridge,
         gt_pose_bridge,

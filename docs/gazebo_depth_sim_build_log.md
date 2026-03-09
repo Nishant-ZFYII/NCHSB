@@ -251,3 +251,22 @@ ros2 launch rc_model_description fortress_bringup.launch.py \
 ```bash
 ign gazebo -g
 ```
+
+### Fix attempt 3: Split rgbd_camera into separate camera + depth_camera (2026-03-09)
+
+**Root cause confirmed:** The `rgbd_camera` sensor type creates a combined rendering pipeline that hangs Gazebo Fortress on dual-GPU systems during initialization. Even in server-only mode, the combined sensor blocks `gz_ros2_control`. The `rgbd_camera` type also has [known issues](https://github.com/gazebosim/gz-sensors/issues/239) with frame_id handling in Fortress.
+
+**Solution:** Following the pattern from [acceleration-robotics/ros2-igt IGT One model](https://raw.githubusercontent.com/acceleration-robotics/ros2-igt/e70d16ff4486b0a136afc1f7a1ed6f60fb6340e3/igt_ignition/models/igt_one/model.sdf), split into two separate sensors:
+- `camera_color` (type: `camera`) -- publishes `/camera_color/image`, `/camera_color/camera_info`
+- `camera_depth` (type: `depth_camera`) -- publishes `/camera_depth/depth_image`, `/camera_depth/camera_info`
+
+Both at 320x240, 10Hz, `visualize=false`. Separate sensors have independent rendering init paths which avoids the deadlock.
+
+**Files changed:**
+- `links.xacro`: Replaced single `<sensor type="rgbd_camera">` with two sensors: `<sensor type="camera">` + `<sensor type="depth_camera">`
+- `fortress_bringup.launch.py`: Split `camera_bridge` into `camera_color_bridge` and `camera_depth_bridge`, with remappings to match real robot topic names:
+  - `/camera_color/image` → `/camera/color/image_raw`
+  - `/camera_depth/depth_image` → `/camera/depth`
+  - `/camera_color/camera_info` → `/camera/color/camera_info`
+
+**Also kept from fix 2:** Server-only mode (`gui:=false` default), NVIDIA PRIME env vars, increased controller spawner timeouts (120s) and delays (25s/30s).
