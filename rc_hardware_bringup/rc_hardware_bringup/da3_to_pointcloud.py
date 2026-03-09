@@ -83,7 +83,8 @@ class Da3ToPointCloud(Node):
         depth = self._bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
         depth = depth.astype(np.float32)
 
-        if depth.max() > 100.0:
+        finite = depth[np.isfinite(depth)]
+        if finite.size > 0 and finite.max() > 100.0:
             depth = depth / 1000.0
 
         ds = self._downsample

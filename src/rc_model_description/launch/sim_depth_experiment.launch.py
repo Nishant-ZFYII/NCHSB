@@ -166,7 +166,7 @@ def generate_launch_description():
                 'max_depth': 5.0,
                 'min_height': 0.05,
                 'max_height': 0.50,
-                'camera_height': 0.08,
+                'camera_height': 0.20,
                 'downsample': 2,
                 'use_sim_time': True,
             }],
