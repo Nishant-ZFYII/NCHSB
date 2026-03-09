@@ -229,10 +229,25 @@ RViz2 should auto-launch. Add two Image displays:
    - Ackermann spawner delay: 10s → 30s
    - Controller manager timeout: 30s → 120s
 
-**If the fix still doesn't work, try in terminal before launching:**
+**Fix attempt 1 (FAILED):** NVIDIA PRIME env vars + reduced camera (320x240@10Hz) + increased timeouts did NOT fix the issue. The libEGL warnings disappeared (NVIDIA EGL is being used) but the rendering pipeline still hangs during camera sensor initialization, blocking gz_ros2_control from ever loading. The Gazebo GUI shows a black screen with "GUI is not responding."
+
+**Fix attempt 2 (server-only mode):** The root cause is that the camera sensor's rendering initialization hangs the Gazebo process when the GUI is active. The fix is to run Gazebo in **server-only mode** (`-s` flag), which separates physics+sensor processing from the GUI rendering.
+
+Changes to `fortress_bringup.launch.py`:
+- Added `gui` launch argument (default: `false`)
+- When `gui:=false`: launches with `ign gazebo -s -r` (server-only, no GUI window)
+- When `gui:=true`: launches with `ign gazebo -r` (with GUI, may hang on dual-GPU)
+- To see the sim visually: open `ign gazebo -g` in a separate terminal after launch
+- RViz2 still launches for ROS topic visualization regardless of gui mode
+
+**Launch command (server-only, default):**
 ```bash
-export __NV_PRIME_RENDER_OFFLOAD=1
-export __GLX_VENDOR_LIBRARY_NAME=nvidia
-export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
-export DRI_PRIME=1
+source ~/MS_Project/NCHSB/install/setup.bash
+ros2 launch rc_model_description fortress_bringup.launch.py \
+    world:=corridor_narrow.sdf spawn_x:=-6.5 spawn_y:=0.0 spawn_yaw:=0.0
+```
+
+**To also see Gazebo GUI (separate terminal):**
+```bash
+ign gazebo -g
 ```

@@ -6,7 +6,8 @@ from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, IncludeLaunchDescription,
                             SetEnvironmentVariable, AppendEnvironmentVariable, 
                             OpaqueFunction, ExecuteProcess, TimerAction)
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -132,6 +133,10 @@ def generate_launch_description():
                          description='Spawn X (m)')
     spawn_yaw      = DeclareLaunchArgument('spawn_yaw', default_value='-1.5078',
                          description='Spawn yaw (rad)')
+    gui_arg        = DeclareLaunchArgument('gui', default_value='false',
+                         description='Launch Gazebo with GUI (true) or server-only (false). '
+                                     'Server-only avoids rendering hang on dual-GPU systems. '
+                                     'Use "ign gazebo -g" in a separate terminal for GUI.')
     # Force NVIDIA GPU for Gazebo rendering (dual-GPU system: Intel iGPU + NVIDIA dGPU)
     # Without this, Gazebo ogre2 may try Intel's EGL/DRI2 which fails for camera sensors
     set_prime  = SetEnvironmentVariable(name='__NV_PRIME_RENDER_OFFLOAD', value='1')
@@ -170,13 +175,24 @@ def generate_launch_description():
     )
 
     # Start Gazebo (Fortress/Harmonic)
-    # -r = auto-run (don't start paused); without this the physics loop
-    # never ticks, controllers can't activate, and no odom/scan is produced.
-    gz_launch = IncludeLaunchDescription(
+    # -r = auto-run (don't start paused); -s = server-only (no GUI window)
+    # Server-only mode avoids the rendering hang caused by rgbd_camera sensor
+    # on dual-GPU systems (Intel iGPU + NVIDIA dGPU). Use "ign gazebo -g" in a
+    # separate terminal to open the GUI when needed.
+    gui_val = LaunchConfiguration('gui')
+    gz_launch_server = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([ros_gz_share, 'launch', 'gz_sim.launch.py'])
         ),
-        launch_arguments={'gz_args': ['-r ', world_path]}.items()
+        launch_arguments={'gz_args': ['-s -r ', world_path]}.items(),
+        condition=IfCondition(PythonExpression(["'", gui_val, "' == 'false'"]))
+    )
+    gz_launch_gui = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution([ros_gz_share, 'launch', 'gz_sim.launch.py'])
+        ),
+        launch_arguments={'gz_args': ['-r ', world_path]}.items(),
+        condition=IfCondition(PythonExpression(["'", gui_val, "' == 'true'"]))
     )
 
     scan_bridge = Node(
@@ -285,9 +301,11 @@ def generate_launch_description():
 
     return LaunchDescription([
         world_file, world_name, model_name, use_sim_time, spawn_z, spawn_x, spawn_y, spawn_yaw,
+        gui_arg,
         set_prime, set_glx, set_egl,
         set_gz_res, set_ign_res, set_hospital_models, set_hospital_ign, controllers_yaml,
-        gz_launch,
+        gz_launch_server,
+        gz_launch_gui,
         OpaqueFunction(function=_prepare_and_spawn),
         scan_bridge,
         camera_bridge,
