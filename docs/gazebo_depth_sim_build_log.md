@@ -107,24 +107,89 @@ None. Clean branch creation.
 
 ## Phase 1: Add RGBD Camera to Robot
 
-**Date:** (pending)  
+**Date:** 2026-02-27  
 **Goal:** Add an RGBD camera sensor to the simulated robot matching the real Orbbec Femto Bolt specs (640x480, 15Hz, 0.1-5.0m). Bridge camera topics to ROS2.
 
-### Files to modify:
-- `src/rc_model_description/urdf/links.xacro` -- add `camera_link`, `camera_color_optical_frame`, RGBD sensor
-- `src/rc_model_description/urdf/joints.xacro` -- add `camera_joint` (fixed, from `chassis_link`)
-- `src/rc_model_description/launch/fortress_bringup.launch.py` -- bridge `/camera/*` topics
+### Design Decisions
 
-### Checkpoint 1 (Manual Test):
+- **Camera mount position:** Copied exactly from `rc_hardware_bringup/urdf/rc_model_hardware.urdf.xacro` -- `xyz="0.0 0.05 0.08"` relative to `chassis_link`, rotated `rpy="0 0 -1.5707"` (90 deg yaw to face forward since chassis_link's Y-axis is rotated from base_link)
+- **Optical frames:** Both `camera_color_optical_frame` and `camera_depth_optical_frame` with the standard `-90 deg roll, -90 deg yaw` rotation to get Z-forward camera convention
+- **Sensor type:** `rgbd_camera` (Gazebo Ignition Fortress native sensor), not `camera` + separate `depth_camera`
+- **Update rate:** 15 Hz (not 30 Hz) -- balances between the real sensor's 30 Hz and sim performance on GTX 1060
+- **Resolution:** 640x480 matching real Femto Bolt
+- **Depth range:** 0.1m - 10.0m (real sensor 0.1m - 5.0m, extended for sim flexibility)
+- **Bridge remappings:** Gazebo publishes `/camera/image`, `/camera/depth_image`, `/camera/camera_info`; remapped to `/camera/color/image_raw`, `/camera/depth`, `/camera/color/camera_info` to match real robot's topic names
+
+### Files Modified
+
+**1. `src/rc_model_description/urdf/links.xacro`**  
+Added `camera_link` (small black box visual), `camera_color_optical_frame`, `camera_depth_optical_frame` links. Attached `<gazebo reference="camera_link">` block with the `rgbd_camera` sensor (topic=`camera`, 640x480, 15Hz, hfov=60deg, clip 0.1-10m). Uses `gz_frame_id=camera_color_optical_frame` so published images have the correct TF frame.
+
+**2. `src/rc_model_description/urdf/joints.xacro`**  
+Added three fixed joints: `camera_joint` (chassis→camera_link), `camera_depth_optical_joint` and `camera_color_optical_joint` (camera_link→optical frames). Mount position and optical frame rotations match the real hardware URDF exactly.
+
+**3. `src/rc_model_description/launch/fortress_bringup.launch.py`**  
+Added `camera_bridge` Node using `ros_gz_bridge` with three topic bridges:
+- `/camera/image` → `/camera/color/image_raw` (RGB, gz.msgs.Image → sensor_msgs/Image)
+- `/camera/depth_image` → `/camera/depth` (Depth, gz.msgs.Image → sensor_msgs/Image)
+- `/camera/camera_info` → `/camera/color/camera_info` (CameraInfo)
+
+Added `camera_bridge` to the LaunchDescription return list, between `scan_bridge` and `imu_bridge`.
+
+### Errors & Fixes
+
+None during implementation. Code follows existing patterns (LiDAR sensor block and bridge).
+
+### Checkpoint 1 (Manual Test -- YOU RUN):
+
+**Step 1: Build**
 ```bash
+cd ~/MS_Project/NCHSB
 colcon build --packages-select rc_model_description
+source install/setup.bash
+```
+
+**Step 2: Launch Gazebo + Robot**
+```bash
 ros2 launch rc_model_description fortress_bringup.launch.py \
     world:=corridor_narrow.sdf spawn_x:=-6.5 spawn_y:=0.0 spawn_yaw:=0.0
 ```
-- [ ] `/camera/color/image_raw` publishes
-- [ ] `/camera/depth` publishes at ~15Hz
-- [ ] `/scan` (LiDAR) still works
-- [ ] RViz2 shows RGB + depth images
-- [ ] Robot spawns correctly
 
-(entries will be added as work proceeds)
+**Step 3: Verify topics (new terminal)**
+```bash
+source ~/MS_Project/NCHSB/install/setup.bash
+ros2 topic list | grep -E "camera|scan"
+```
+Expected output:
+```
+/camera/color/camera_info
+/camera/color/image_raw
+/camera/depth
+/scan
+/scan/points
+```
+
+**Step 4: Check camera publish rate**
+```bash
+ros2 topic hz /camera/depth
+```
+Expected: ~15 Hz
+
+**Step 5: Check LiDAR still works**
+```bash
+ros2 topic hz /scan
+```
+Expected: ~25 Hz
+
+**Step 6: Visualize in RViz2**
+RViz2 should auto-launch. Add two Image displays:
+- Topic: `/camera/color/image_raw` -- should show corridor RGB view
+- Topic: `/camera/depth` -- should show depth map (darker = closer)
+
+**Pass/Fail Criteria:**
+- [ ] All 5 camera+scan topics appear in `ros2 topic list`
+- [ ] `/camera/depth` publishes at ~15 Hz
+- [ ] `/scan` still publishes at ~25 Hz
+- [ ] RGB image shows the corridor in RViz2
+- [ ] Depth image shows corridor geometry in RViz2
+- [ ] Robot spawns and is visible in Gazebo GUI

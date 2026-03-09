@@ -52,6 +52,25 @@
         <child link="lidar_link"/>
     </joint>
 
+    <!-- Camera mount (matches rc_model_hardware.urdf.xacro) -->
+    <joint name="camera_joint" type="fixed">
+        <origin xyz="0.0 0.05 0.08" rpy="0 0 -1.5707"/>
+        <parent link="chassis_link"/>
+        <child link="camera_link"/>
+    </joint>
+
+    <joint name="camera_depth_optical_joint" type="fixed">
+        <origin xyz="0 0 0" rpy="-1.5707 0 -1.5707"/>
+        <parent link="camera_link"/>
+        <child link="camera_depth_optical_frame"/>
+    </joint>
+
+    <joint name="camera_color_optical_joint" type="fixed">
+        <origin xyz="0 0 0" rpy="-1.5707 0 -1.5707"/>
+        <parent link="camera_link"/>
+        <child link="camera_color_optical_frame"/>
+    </joint>
+
     <joint name="Rigid_278" type="fixed">
         <origin xyz="0.0 0.09463 0.02275" rpy="0 0 0" />
         <parent link="chassis_link" />
