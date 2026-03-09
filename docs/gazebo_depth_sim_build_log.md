@@ -658,13 +658,16 @@ Initial launch used `camera_height=0.08` (just the chassis→camera offset). But
 
 **Fix:** Changed `camera_height` to `0.20` in `sim_depth_experiment.launch.py`.
 
-### Checkpoint 3 Results (Partial)
+### Checkpoint 3 Results
 
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
 | `/depth/pointcloud` publishes | ~2 Hz | 1.9 Hz | PASS |
-| PointCloud2 has points | non-zero width | TBD | TBD |
-| Points visible in RViz | colored dots | TBD | TBD |
+| PointCloud2 has points | non-zero width | width=11384, is_dense=true | PASS |
+| Points visible in RViz | colored dots | Rainbow-colored wall points visible | PASS |
+| Global Status | Ok | Ok | PASS |
+
+Screenshot: `docs/checkpoint3_rviz_pointcloud.png` -- shows depth-derived PointCloud2 (rainbow axis-color) projecting corridor walls in front of the robot, with TF tree, LiDAR scan (red), and robot model all functioning.
 
 ### Commits (Phase 3)
 
