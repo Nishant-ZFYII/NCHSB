@@ -18,7 +18,10 @@ def _prepare_and_spawn(context, *args, **kwargs):
     xacro_file = os.path.join(pkg_share, 'urdf', 'rc_model_ros2.xacro')
 
     # 1) xacro -> URDF string (fresh every launch)
-    urdf_xml = xacro.process_file(xacro_file).toxml()
+    enable_cams = LaunchConfiguration('enable_cameras').perform(context)
+    urdf_xml = xacro.process_file(
+        xacro_file, mappings={'enable_cameras': enable_cams}
+    ).toxml()
 
     # 2) Start robot_state_publisher (publishes /robot_description)
     rsp = Node(
@@ -137,14 +140,18 @@ def generate_launch_description():
                          description='Launch Gazebo with GUI (true) or server-only (false). '
                                      'Server-only avoids rendering hang on dual-GPU systems. '
                                      'Use "ign gazebo -g" in a separate terminal for GUI.')
-    # Force NVIDIA GPU for Gazebo rendering (dual-GPU system: Intel iGPU + NVIDIA dGPU)
-    # Without this, Gazebo ogre2 may try Intel's EGL/DRI2 which fails for camera sensors
-    set_prime  = SetEnvironmentVariable(name='__NV_PRIME_RENDER_OFFLOAD', value='1')
-    set_glx    = SetEnvironmentVariable(name='__GLX_VENDOR_LIBRARY_NAME', value='nvidia')
-    set_egl    = SetEnvironmentVariable(
-        name='__EGL_VENDOR_LIBRARY_FILENAMES',
-        value='/usr/share/glvnd/egl_vendor.d/10_nvidia.json'
-    )
+    enable_cameras_arg = DeclareLaunchArgument('enable_cameras', default_value='false',
+                         description='Include camera/depth sensors in URDF. '
+                                     'Disabled by default because ogre2 sensor rendering '
+                                     'deadlocks on dual-GPU (Intel+NVIDIA) systems. '
+                                     'When true, LIBGL_ALWAYS_SOFTWARE=1 is set to force '
+                                     'CPU-based software rendering via Mesa llvmpipe.')
+
+    # Software rendering for camera sensors (dual-GPU workaround).
+    # Forces Mesa llvmpipe (CPU) instead of GPU-accelerated ogre2 which deadlocks
+    # on Intel iGPU + NVIDIA dGPU systems during EGL init for camera sensors.
+    # gpu_lidar works fine with GPU rendering, but camera/depth_camera do not.
+    set_sw_render = SetEnvironmentVariable(name='LIBGL_ALWAYS_SOFTWARE', value='1')
 
     # Resource paths (models & worlds)
     set_gz_res  = SetEnvironmentVariable(
@@ -314,8 +321,8 @@ def generate_launch_description():
 
     return LaunchDescription([
         world_file, world_name, model_name, use_sim_time, spawn_z, spawn_x, spawn_y, spawn_yaw,
-        gui_arg,
-        set_prime, set_glx, set_egl,
+        gui_arg, enable_cameras_arg,
+        set_sw_render,
         set_gz_res, set_ign_res, set_hospital_models, set_hospital_ign, controllers_yaml,
         gz_launch_server,
         gz_launch_gui,

@@ -220,11 +220,8 @@
     </gazebo>
 
 
-    <!-- ============================================================
-         RGBD Camera (matches Orbbec Femto Bolt on real robot)
-         Sensor attached to camera_link; optical frames rotate into
-         the standard camera convention (Z-forward, X-right, Y-down).
-         ============================================================ -->
+    <!-- Camera links are always present (for TF tree integrity).
+         Gazebo sensors are conditionally included via enable_cameras arg. -->
     <link name="camera_link">
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -238,10 +235,11 @@
     <link name="camera_color_optical_frame"/>
     <link name="camera_depth_optical_frame"/>
 
+    <xacro:arg name="enable_cameras" default="false"/>
+    <xacro:if value="$(arg enable_cameras)">
     <!-- Separate camera + depth_camera instead of rgbd_camera.
-         The rgbd_camera type hangs Gazebo Fortress on dual-GPU systems
-         during rendering init. Separate sensors have independent, lighter
-         init paths. Pattern from github.com/acceleration-robotics/ros2-igt -->
+         Requires LIBGL_ALWAYS_SOFTWARE=1 on dual-GPU systems to avoid
+         ogre2 rendering deadlock. -->
     <gazebo reference="camera_link">
       <sensor name="camera_color" type="camera">
         <pose>0 0 0 0 0 0</pose>
@@ -284,6 +282,7 @@
         <gz_frame_id>camera_depth_optical_frame</gz_frame_id>
       </sensor>
     </gazebo>
+    </xacro:if>
 
     <link name="servo">
         <inertial>

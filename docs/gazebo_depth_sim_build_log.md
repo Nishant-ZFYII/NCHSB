@@ -270,3 +270,35 @@ Both at 320x240, 10Hz, `visualize=false`. Separate sensors have independent rend
   - `/camera_color/camera_info` → `/camera/color/camera_info`
 
 **Also kept from fix 2:** Server-only mode (`gui:=false` default), NVIDIA PRIME env vars, increased controller spawner timeouts (120s) and delays (25s/30s).
+
+**Result: FAILED.** `gazebo_sim_logs3.txt` shows same pattern: entity created OK, but `gz_ros2_control` never loads, controller spawners timeout at 120s. Separate `camera` + `depth_camera` sensors still deadlock the ogre2 rendering pipeline on dual-GPU (Intel iGPU + NVIDIA dGPU).
+
+### Fix attempt 4: Xacro camera toggle + software rendering (2026-03-09)
+
+**Root cause update:** The problem is NOT the sensor type (`rgbd_camera` vs separate `camera`/`depth_camera`). ANY camera-type sensor triggers an ogre2 rendering initialization deadlock on this dual-GPU system. The `gpu_lidar` sensor works because it uses a simpler ray-casting pipeline, but camera sensors require full framebuffer rasterization through EGL, which deadlocks regardless of whether NVIDIA PRIME or Intel Mesa is used for hardware rendering.
+
+**Solution: Two-pronged approach:**
+
+1. **Xacro `enable_cameras` toggle** (default `false`):
+   - Camera links remain in URDF always (TF tree integrity)
+   - Camera *sensors* are conditionally included via `<xacro:if value="$(arg enable_cameras)">`
+   - With `enable_cameras:=false` (default), simulation works identically to pre-camera URDF
+   - For depth error injection, we'll publish synthetic depth from a ROS node instead of relying on Gazebo camera rendering
+
+2. **Software rendering** (`LIBGL_ALWAYS_SOFTWARE=1`):
+   - Removed all three NVIDIA PRIME env vars (`__NV_PRIME_RENDER_OFFLOAD`, `__GLX_VENDOR_LIBRARY_NAME`, `__EGL_VENDOR_LIBRARY_FILENAMES`)
+   - Added `LIBGL_ALWAYS_SOFTWARE=1` which forces Mesa's llvmpipe (CPU-based software rasterizer)
+   - This bypasses ALL GPU driver issues since rendering happens purely on CPU
+   - At 320x240@10Hz, CPU load should be manageable
+   - When user wants to test cameras: `enable_cameras:=true`
+
+**Files changed:**
+- `links.xacro`: Added `<xacro:arg name="enable_cameras" default="false"/>` and wrapped camera sensor `<gazebo>` block in `<xacro:if>`
+- `fortress_bringup.launch.py`:
+  - Added `enable_cameras` launch argument (default `false`), passed to xacro via mappings
+  - Replaced 3 NVIDIA PRIME `SetEnvironmentVariable` with single `LIBGL_ALWAYS_SOFTWARE=1`
+  - Updated `LaunchDescription` return list
+
+**Test plan:**
+- **Test A** (`enable_cameras:=false`): Must work -- no camera sensors in URDF, same as original working setup
+- **Test B** (`enable_cameras:=true`): Tests software rendering with cameras -- may work with CPU-based ogre2
