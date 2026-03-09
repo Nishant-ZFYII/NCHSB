@@ -93,8 +93,26 @@ Visualization Manager:
       Topic:
         Value: /local_plan_trajectories
 
+    - Class: rviz_default_plugins/Image
+      Name: RGB Camera
+      Enabled: true
+      Topic:
+        Value: /camera/color/image_raw
+      Max Value: 1
+      Min Value: 0
+      Normalize Range: true
+
+    - Class: rviz_default_plugins/Image
+      Name: Depth Camera
+      Enabled: true
+      Topic:
+        Value: /camera/depth
+      Max Value: 1
+      Min Value: 0
+      Normalize Range: true
+
   Global Options:
-    Fixed Frame: map
+    Fixed Frame: odom
   Tools:
     - Class: rviz_default_plugins/Interact
     - Class: rviz_default_plugins/MoveCamera
