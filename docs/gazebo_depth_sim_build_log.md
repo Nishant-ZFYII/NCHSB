@@ -641,3 +641,34 @@ Gazebo GT depth ──→ depth_error_injector ──→ da3_to_pointcloud ─�
 4. **Timing:** Nav2 starts at +35s (after Gazebo, robot, controllers are up). Goal sender at +55s (after Nav2 lifecycle activation + AMCL convergence).
 
 5. **Auto-map resolution:** Launch file auto-derives the map YAML from the world file name (e.g., `corridor_narrow.sdf` → `maps/corridor_narrow.yaml`).
+
+### Checkpoint 3 Debugging
+
+**Issue 1: da3_to_pointcloud produces no output**
+
+`/depth/pointcloud` never published despite `da3_to_pointcloud` receiving intrinsics and depth images.
+
+**Root cause:** `da3_to_pointcloud.py` line 86: `if depth.max() > 100.0: depth = depth / 1000.0`. Gazebo depth images contain `inf` pixels (beyond 10m clip plane), and `inf > 100.0 == True`. This falsely triggers the mm-to-m conversion, dividing all valid metric depths by 1000 (e.g., 1.5m → 0.0015m). These sub-millimeter values then fail the `min_depth=0.3m` filter, producing zero points.
+
+**Fix:** Check only finite pixels: `finite = depth[np.isfinite(depth)]; if finite.size > 0 and finite.max() > 100.0:`. File: `rc_hardware_bringup/rc_hardware_bringup/da3_to_pointcloud.py`.
+
+**Issue 2: camera_height=0.08 too low**
+
+Initial launch used `camera_height=0.08` (just the chassis→camera offset). But the total camera height above ground is `spawn_z(0.12) + camera_z(0.08) = 0.20m`. With the wrong height, the height filter (`height_above_ground = cam_height - Y`) rejected all points because it underestimated where the ground was.
+
+**Fix:** Changed `camera_height` to `0.20` in `sim_depth_experiment.launch.py`.
+
+### Checkpoint 3 Results (Partial)
+
+| Check | Expected | Actual | Status |
+|-------|----------|--------|--------|
+| `/depth/pointcloud` publishes | ~2 Hz | 1.9 Hz | PASS |
+| PointCloud2 has points | non-zero width | TBD | TBD |
+| Points visible in RViz | colored dots | TBD | TBD |
+
+### Commits (Phase 3)
+
+| Hash | Message |
+|------|---------|
+| `a4d81f4` | Phase 3: Add Nav2 depth experiment launch + config |
+| `5bc0a2c` | Fix: da3_to_pointcloud mm-to-m check ignores inf pixels |
