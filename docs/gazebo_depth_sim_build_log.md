@@ -302,3 +302,17 @@ Both at 320x240, 10Hz, `visualize=false`. Separate sensors have independent rend
 **Test plan:**
 - **Test A** (`enable_cameras:=false`): Must work -- no camera sensors in URDF, same as original working setup
 - **Test B** (`enable_cameras:=true`): Tests software rendering with cameras -- may work with CPU-based ogre2
+
+**Result: FAILED (logs4 + logs5).** Both launches failed -- gz_ros2_control never loaded. Root cause: `LIBGL_ALWAYS_SOFTWARE=1` was set **globally**, which broke the `gpu_lidar`'s ogre2 rendering too (it worked fine with hardware rendering). The env var poisoned ALL rendering, not just camera rendering. Log4 (cameras OFF) confirmed cameras are NOT the issue -- the software rendering broke gpu_lidar.
+
+### Fix attempt 5: Conditional software rendering + restore gui=true (2026-03-09)
+
+**Root cause:** `LIBGL_ALWAYS_SOFTWARE=1` set globally broke `gpu_lidar` rendering. The lidar previously worked fine with hardware GPU (Intel/NVIDIA). Software rendering via llvmpipe is incompatible with ogre2's gpu_lidar implementation on this system. Also, `gui:=false` (server-only mode) meant no Gazebo window appeared, which was confusing.
+
+**Fix:**
+1. Made `LIBGL_ALWAYS_SOFTWARE=1` conditional -- only set when `enable_cameras:=true` (uses `IfCondition`)
+2. Restored `gui` default to `true` (Gazebo window appears normally)
+3. When `enable_cameras:=false` (default), NO rendering env vars are set -- system uses defaults, same as the original working setup
+
+**Files changed:**
+- `fortress_bringup.launch.py`: Added `condition=IfCondition(LaunchConfiguration('enable_cameras'))` to `SetEnvironmentVariable`, changed `gui` default from `'false'` to `'true'`
