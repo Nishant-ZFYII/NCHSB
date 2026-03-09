@@ -675,3 +675,36 @@ Screenshot: `docs/checkpoint3_rviz_pointcloud.png` -- shows depth-derived PointC
 |------|---------|
 | `a4d81f4` | Phase 3: Add Nav2 depth experiment launch + config |
 | `5bc0a2c` | Fix: da3_to_pointcloud mm-to-m check ignores inf pixels |
+
+---
+
+## Phase 4: Visual Realism -- Furnished Corridor (2026-03-09)
+
+### Goal
+
+Add furniture, a glass panel, and a reflective floor patch to the corridor world for RGB camera visual realism. These objects create depth challenges (glass = sensor-invisible, reflective floor = glare artifacts) and visual texture for the RGB camera.
+
+### Files Created
+
+| File | Description |
+|------|-------------|
+| `worlds/corridor_narrow_furnished.sdf` | Copy of `corridor_narrow.sdf` with 5 added objects |
+| `maps/corridor_narrow_furnished.yaml` | Map config pointing to same PGM (walls unchanged) |
+| `maps/corridor_narrow_furnished.pgm` | Copy of base map (identical wall layout) |
+
+### Added Objects
+
+| Object | Position | Size | Purpose |
+|--------|----------|------|---------|
+| **Chair** | x=-4.0, y=0.65 (left, south wall) | 0.18x0.18x0.33m | Textured brown furniture, 4 legs + seat + backrest |
+| **Hospital cart** | x=1.5, y=-0.40 (narrow, north wall) | 0.30x0.18x0.30m | White/blue cart on wheels, forces robot to squeeze |
+| **Trash can** | x=5.0, y=-0.70 (right, north wall) | r=0.08, h=0.20m | Dark green cylinder obstacle |
+| **Glass panel** | x=-0.5, y=0.45 (narrow, south wall) | 0.40x0.02x0.50m | Semi-transparent (alpha=0.3), has collision but LiDAR passes through glass in real deployments |
+| **Reflective floor** | x=3.5, y=0.0 (right section) | 2.0x1.8x0.002m | High-specular material simulating polished hospital floor |
+
+### Design Decisions
+
+1. **Inline SDF models** instead of Ignition Fuel URIs: no internet dependency, exact control over scale and materials, guaranteed Fortress compatibility.
+2. **Same SLAM map**: Furniture objects are detected at runtime by the obstacle layer, not baked into the static map. AMCL localizes from wall features which are unchanged.
+3. **Scale-appropriate**: The RC car corridor has 0.5m walls and 1.5-2.0m width. Furniture is sized proportionally (~0.15-0.30m objects).
+4. **Clearance maintained**: Every object leaves ≥0.5m clearance for the robot to navigate around.

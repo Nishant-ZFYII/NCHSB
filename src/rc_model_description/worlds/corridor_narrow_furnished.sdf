@@ -1,0 +1,480 @@
+<?xml version="1.0" ?>
+<!--
+  Furnished narrow corridor for depth error injection experiments.
+  Based on corridor_narrow.sdf with added furniture, glass panel,
+  and reflective floor patch for RGB camera visual realism.
+
+  Added objects:
+  - Chair (x=-4.0): textured brown, near south wall
+  - Hospital cart (x=1.5): white/blue, near north wall
+  - Trash can (x=5.0): dark green cylinder, near north wall
+  - Glass panel (x=-0.5): semi-transparent, near south wall in narrow section
+  - Reflective floor (x=3.5): high-specular patch in right section
+
+  All objects are small enough for the RC car to navigate around.
+  AMCL map (corridor_narrow.yaml) still valid: objects don't block wall features.
+  Default robot spawn: x=-6.5, y=0.0, yaw=0.0
+-->
+<sdf version="1.6">
+  <world name="default">
+    <plugin filename="libignition-gazebo-physics-system.so" name="ignition::gazebo::systems::Physics"/>
+    <plugin filename="libignition-gazebo-user-commands-system.so" name="ignition::gazebo::systems::UserCommands"/>
+    <plugin filename="libignition-gazebo-scene-broadcaster-system.so" name="ignition::gazebo::systems::SceneBroadcaster"/>
+    <plugin filename="libignition-gazebo-imu-system.so" name="ignition::gazebo::systems::Imu"/>
+    <plugin filename="libignition-gazebo-sensors-system.so" name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <light name="sun" type="directional">
+      <pose>0 0 10 0 0.5 0</pose>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>1 1 1 1</specular>
+      <direction>-1 -1 -1</direction>
+      <cast_shadows>true</cast_shadows>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>50 50</size></plane></geometry>
+          <surface><friction><ode><mu>100</mu><mu2>50</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>50 50</size></plane></geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===== WALLS ===== -->
+
+    <!-- South wall: left section (x=-7.5 to -2.5, y=1.0, 2m wide) -->
+    <model name="wall_south_left">
+      <static>true</static>
+      <pose>-5 1.0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>5 0.1 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>5 0.1 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- South wall: narrow section (x=-2.5 to +2.5, y=0.75, 1.5m wide) -->
+    <model name="wall_south_narrow">
+      <static>true</static>
+      <pose>0 0.75 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>5 0.1 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>5 0.1 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- South wall: right section (x=+2.5 to +7.5, y=1.0, 2m wide) -->
+    <model name="wall_south_right">
+      <static>true</static>
+      <pose>5 1.0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>5 0.1 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>5 0.1 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- North wall: left section -->
+    <model name="wall_north_left">
+      <static>true</static>
+      <pose>-5 -1.0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>5 0.1 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>5 0.1 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- North wall: narrow section -->
+    <model name="wall_north_narrow">
+      <static>true</static>
+      <pose>0 -0.75 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>5 0.1 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>5 0.1 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- North wall: right section -->
+    <model name="wall_north_right">
+      <static>true</static>
+      <pose>5 -1.0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>5 0.1 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>5 0.1 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Transition walls at width changes -->
+    <model name="wall_trans_south_west">
+      <static>true</static>
+      <pose>-2.5 0.875 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.1 0.25 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 0.25 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_trans_south_east">
+      <static>true</static>
+      <pose>2.5 0.875 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.1 0.25 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 0.25 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_trans_north_west">
+      <static>true</static>
+      <pose>-2.5 -0.875 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.1 0.25 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 0.25 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_trans_north_east">
+      <static>true</static>
+      <pose>2.5 -0.875 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.1 0.25 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 0.25 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- West end wall -->
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-7.5 0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.1 2.0 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 2.0 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- East end wall -->
+    <model name="wall_east">
+      <static>true</static>
+      <pose>7.5 0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.1 2.0 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 2.0 0.5</size></box></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.5 0.5 0.5 1</diffuse><specular>0.1 0.1 0.1 1</specular></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===== FEATURES: LEFT SECTION (x=-7.5 to -2.5) ===== -->
+    <!-- Pattern: 2 south features, 2 north features, aperiodic gaps -->
+
+    <!-- South wall: pillar at -6.8, large-pillar at -4.2 -->
+    <model name="feat_1">
+      <static>true</static>
+      <pose>-6.8 0.925 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_2">
+      <static>true</static>
+      <pose>-4.2 0.90 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.20 0.20 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.20 0.20 0.5</size></box></geometry>
+          <material><ambient>0.35 0.25 0.20 1</ambient><diffuse>0.45 0.35 0.30 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- North wall: cabinet at -5.8, pillar at -3.3 -->
+    <model name="feat_3">
+      <static>true</static>
+      <pose>-5.8 -0.94 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_4">
+      <static>true</static>
+      <pose>-3.3 -0.925 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===== FEATURES: NARROW SECTION (x=-2.5 to +2.5) ===== -->
+    <!-- Previously had ZERO features — added 3 to break symmetry -->
+
+    <!-- South wall: cabinet at -1.3, pillar at 1.6 -->
+    <model name="feat_5">
+      <static>true</static>
+      <pose>-1.3 0.69 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.25 0.12 0.25</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.25 0.12 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_6">
+      <static>true</static>
+      <pose>1.6 0.675 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- North wall: large-pillar at 0.4 -->
+    <model name="feat_7">
+      <static>true</static>
+      <pose>0.4 -0.65 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.20 0.20 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.20 0.20 0.5</size></box></geometry>
+          <material><ambient>0.35 0.25 0.20 1</ambient><diffuse>0.45 0.35 0.30 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===== FEATURES: RIGHT SECTION (x=+2.5 to +7.5) ===== -->
+    <!-- DIFFERENT pattern from left: cabinet-pillar-cabinet on south, pillar on north -->
+    <!-- Gaps: 1.2m, 2.0m (different from left's 2.6m gap) -->
+
+    <!-- South wall: cabinet at 3.2, pillar at 4.4, cabinet at 6.4 -->
+    <model name="feat_8">
+      <static>true</static>
+      <pose>3.2 0.94 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_9">
+      <static>true</static>
+      <pose>4.4 0.925 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.15 0.15 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.5</size></box></geometry>
+          <material><ambient>0.4 0.3 0.25 1</ambient><diffuse>0.5 0.4 0.35 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_10">
+      <static>true</static>
+      <pose>6.4 0.94 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- North wall: large-pillar at 5.0, cabinet at 7.0 -->
+    <model name="feat_11">
+      <static>true</static>
+      <pose>5.0 -0.90 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.20 0.20 0.5</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.20 0.20 0.5</size></box></geometry>
+          <material><ambient>0.35 0.25 0.20 1</ambient><diffuse>0.45 0.35 0.30 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="feat_12">
+      <static>true</static>
+      <pose>7.0 -0.94 0.125 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.3 0.12 0.25</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 0.12 0.25</size></box></geometry>
+          <material><ambient>0.25 0.3 0.4 1</ambient><diffuse>0.35 0.4 0.5 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <!-- ===== FURNITURE: VISUAL REALISM + DEPTH CHALLENGES ===== -->
+
+    <!-- Chair: brown box (seat) + backrest, near south wall in left section.
+         Leaves ~0.6m clearance on north side. -->
+    <model name="chair">
+      <static>true</static>
+      <pose>-4.0 0.65 0 0 0 0.3</pose>
+      <link name="link">
+        <!-- Seat -->
+        <collision name="seat_col"><geometry><box><size>0.18 0.18 0.15</size></box></geometry>
+          <pose>0 0 0.075 0 0 0</pose></collision>
+        <visual name="seat_vis"><geometry><box><size>0.18 0.18 0.15</size></box></geometry>
+          <pose>0 0 0.075 0 0 0</pose>
+          <material><ambient>0.45 0.25 0.10 1</ambient><diffuse>0.55 0.30 0.15 1</diffuse><specular>0.05 0.03 0.01 1</specular></material>
+        </visual>
+        <!-- Backrest -->
+        <collision name="back_col"><geometry><box><size>0.18 0.03 0.18</size></box></geometry>
+          <pose>0 -0.075 0.24 0 0 0</pose></collision>
+        <visual name="back_vis"><geometry><box><size>0.18 0.03 0.18</size></box></geometry>
+          <pose>0 -0.075 0.24 0 0 0</pose>
+          <material><ambient>0.40 0.22 0.08 1</ambient><diffuse>0.50 0.28 0.12 1</diffuse><specular>0.05 0.03 0.01 1</specular></material>
+        </visual>
+        <!-- Legs (4x) -->
+        <visual name="leg1"><geometry><cylinder><radius>0.01</radius><length>0.15</length></cylinder></geometry>
+          <pose>0.07 0.07 0.075 0 0 0</pose>
+          <material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual>
+        <visual name="leg2"><geometry><cylinder><radius>0.01</radius><length>0.15</length></cylinder></geometry>
+          <pose>-0.07 0.07 0.075 0 0 0</pose>
+          <material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual>
+        <visual name="leg3"><geometry><cylinder><radius>0.01</radius><length>0.15</length></cylinder></geometry>
+          <pose>0.07 -0.07 0.075 0 0 0</pose>
+          <material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual>
+        <visual name="leg4"><geometry><cylinder><radius>0.01</radius><length>0.15</length></cylinder></geometry>
+          <pose>-0.07 -0.07 0.075 0 0 0</pose>
+          <material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- Hospital cart: white/blue box on wheels, narrow section near north wall.
+         Leaves ~0.7m clearance. -->
+    <model name="hospital_cart">
+      <static>true</static>
+      <pose>1.5 -0.40 0 0 0 0</pose>
+      <link name="link">
+        <!-- Cart body -->
+        <collision name="body_col"><geometry><box><size>0.30 0.18 0.25</size></box></geometry>
+          <pose>0 0 0.175 0 0 0</pose></collision>
+        <visual name="body_vis"><geometry><box><size>0.30 0.18 0.25</size></box></geometry>
+          <pose>0 0 0.175 0 0 0</pose>
+          <material><ambient>0.85 0.85 0.90 1</ambient><diffuse>0.90 0.90 0.95 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+        </visual>
+        <!-- Blue stripe -->
+        <visual name="stripe_vis"><geometry><box><size>0.30 0.19 0.03</size></box></geometry>
+          <pose>0 0 0.26 0 0 0</pose>
+          <material><ambient>0.15 0.25 0.55 1</ambient><diffuse>0.20 0.35 0.70 1</diffuse></material>
+        </visual>
+        <!-- Wheels (4x) -->
+        <visual name="wh1"><geometry><cylinder><radius>0.02</radius><length>0.02</length></cylinder></geometry>
+          <pose>0.12 0.10 0.02 1.5707 0 0</pose>
+          <material><ambient>0.15 0.15 0.15 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material></visual>
+        <visual name="wh2"><geometry><cylinder><radius>0.02</radius><length>0.02</length></cylinder></geometry>
+          <pose>-0.12 0.10 0.02 1.5707 0 0</pose>
+          <material><ambient>0.15 0.15 0.15 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material></visual>
+        <visual name="wh3"><geometry><cylinder><radius>0.02</radius><length>0.02</length></cylinder></geometry>
+          <pose>0.12 -0.10 0.02 1.5707 0 0</pose>
+          <material><ambient>0.15 0.15 0.15 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material></visual>
+        <visual name="wh4"><geometry><cylinder><radius>0.02</radius><length>0.02</length></cylinder></geometry>
+          <pose>-0.12 -0.10 0.02 1.5707 0 0</pose>
+          <material><ambient>0.15 0.15 0.15 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- Trash can: dark green cylinder, right section near north wall. -->
+    <model name="trash_can">
+      <static>true</static>
+      <pose>5.0 -0.70 0.10 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.08</radius><length>0.20</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.08</radius><length>0.20</length></cylinder></geometry>
+          <material><ambient>0.10 0.25 0.10 1</ambient><diffuse>0.15 0.35 0.15 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Glass panel: semi-transparent, near south wall in narrow section.
+         LiDAR passes through glass (no collision for laser rays in practice),
+         but depth camera may or may not detect it depending on error profile.
+         Leaves ~0.8m clearance on north side. -->
+    <model name="glass_panel">
+      <static>true</static>
+      <pose>-0.5 0.45 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.40 0.02 0.50</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.40 0.02 0.50</size></box></geometry>
+          <material>
+            <ambient>0.6 0.8 0.9 0.3</ambient>
+            <diffuse>0.7 0.85 0.95 0.3</diffuse>
+            <specular>0.9 0.9 0.95 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Reflective floor patch: high-specular ground section in right corridor.
+         Simulates polished/waxed hospital floor that causes sensor glare. -->
+    <model name="reflective_floor">
+      <static>true</static>
+      <pose>3.5 0.0 0.001 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>2.0 1.8 0.002</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>2.0 1.8 0.002</size></box></geometry>
+          <material>
+            <ambient>0.75 0.72 0.68 1</ambient>
+            <diffuse>0.80 0.78 0.75 1</diffuse>
+            <specular>0.95 0.95 0.90 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>
