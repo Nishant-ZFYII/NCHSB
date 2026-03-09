@@ -316,3 +316,34 @@ Both at 320x240, 10Hz, `visualize=false`. Separate sensors have independent rend
 
 **Files changed:**
 - `fortress_bringup.launch.py`: Added `condition=IfCondition(LaunchConfiguration('enable_cameras'))` to `SetEnvironmentVariable`, changed `gui` default from `'false'` to `'true'`
+
+**Result: Partial.** Server-only mode (`gui:=false`) worked -- gz_ros2_control loaded, `/controller_manager/list_controllers` appeared. But GUI mode still showed black screen.
+
+### Root cause found: Leaked GPU rendering contexts (2026-03-09)
+
+After 6+ crashed/killed Gazebo Ignition sessions during debugging, the NVIDIA GPU had leaked rendering contexts that prevented ANY new ogre2 rendering from initializing -- even `ign gazebo shapes.sdf` showed a black screen, and the original `feat/corridor-social-nav` branch also failed.
+
+**Diagnosis steps that confirmed this:**
+1. `ign gazebo -v 4 shapes.sdf` → GUI warning: "Waited for 10s for a subscriber to /gazebo/starting_world and got none" (server thread couldn't init rendering)
+2. `ign gazebo -v 4 -s shapes.sdf` → Server works perfectly (physics, all services created)
+3. `gazebo` (Classic v11.10.2) → GUI renders fine (uses ogre 1.x, different rendering path)
+4. `glxinfo | grep "OpenGL renderer"` → NVIDIA GTX 1060 (GPU driver healthy)
+
+**Fix: Reboot.** After `sudo reboot`, `ign gazebo shapes.sdf` rendered correctly. All subsequent launches worked.
+
+**Lesson learned:** Always reboot after multiple crashed Gazebo Ignition sessions on dual-GPU systems. Leaked GPU contexts are not released by killing processes -- they persist until reboot.
+
+### Checkpoint 1: PASSED (2026-03-09)
+
+After reboot, launched with `gui:=true`, `enable_cameras:=false`:
+```bash
+ros2 launch rc_model_description fortress_bringup.launch.py \
+    world:=corridor_narrow.sdf spawn_x:=-6.5 spawn_y:=0.0 spawn_yaw:=0.0 gui:=true
+```
+
+**Results:**
+- Gazebo GUI opens with corridor world visible
+- Robot spawned at (-6.5, 0, 0.12)
+- gz_ros2_control loaded successfully
+- All 16 controller_manager services available
+- joint_state_broadcaster + ackermann_steering_controller active
