@@ -347,3 +347,13 @@ ros2 launch rc_model_description fortress_bringup.launch.py \
 - gz_ros2_control loaded successfully
 - All 16 controller_manager services available
 - joint_state_broadcaster + ackermann_steering_controller active
+
+### Camera sensors working (2026-03-09)
+
+After fixing the bridge topic names (Fortress publishes on `/camera_color` and `/camera_depth`, not `/camera_color/image` or `/camera_depth/depth_image`), camera sensors produce data:
+- `/camera/color/image_raw`: ~2Hz (320x240 RGB)
+- `/camera/depth`: ~3Hz (320x240 depth)
+
+Rates are below configured 10Hz due to `LIBGL_ALWAYS_SOFTWARE=1` (CPU-based software rendering via llvmpipe). Hardware rendering may give higher rates but software rendering avoids dual-GPU deadlocks. Sufficient for depth error injection experiments.
+
+**Checkpoint 1 fully complete:** Robot + LiDAR + IMU + cameras all functional.
