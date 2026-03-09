@@ -1,0 +1,98 @@
+####################################################################
+# NAV2 COSTMAP — LIDAR + SENSOR DEPTH (L+S)
+#
+# Ablation config: uses RPLiDAR A2M8 scan AND the Femto Bolt's
+# native depth sensor projected to PointCloud2.  This serves as
+# the "ground truth" fusion baseline — the sensor depth is
+# hardware-measured, unlike DA3's monocular estimate.
+####################################################################
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 10.0
+      publish_frequency: 5.0
+      global_frame: odom
+      robot_base_frame: base_link
+
+      footprint: "[[0.20, 0.08], [0.20, -0.08], [-0.10, -0.08], [-0.10, 0.08]]"
+
+      use_radius: false
+      use_sim_time: false
+      rolling_window: true
+      width: 6
+      height: 6
+      resolution: 0.05
+
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      footprint_padding: 0.0
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: true
+        subscribe_to_updates: true
+        track_unknown_space: false
+        lethal_cost_threshold: 80
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        observation_sources: scan sensor_depth_pointcloud
+        scan:
+          topic: /scan
+          sensor_frame: laser
+          data_type: LaserScan
+          clearing: true
+          marking: true
+          obstacle_range: 6.0
+          raytrace_range: 8.0
+          max_obstacle_height: 0.5
+        sensor_depth_pointcloud:
+          topic: /sensor_depth/pointcloud
+          sensor_frame: camera_color_optical_frame
+          data_type: PointCloud2
+          clearing: false
+          marking: true
+          obstacle_range: 5.0
+          raytrace_range: 5.5
+          max_obstacle_height: 0.5
+          min_obstacle_height: 0.05
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.09
+
+      always_send_full_costmap: True
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: map
+      robot_base_frame: base_link
+      use_sim_time: false
+      rolling_window: false
+
+      footprint: "[[0.20, 0.08], [0.20, -0.08], [-0.10, -0.08], [-0.10, 0.08]]"
+
+      use_radius: false
+      resolution: 0.05
+      track_unknown_space: false
+      footprint_padding: 0.0
+
+      plugins: ["static_layer", "inflation_layer"]
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: true
+        subscribe_to_updates: true
+        track_unknown_space: false
+        lethal_cost_threshold: 80
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.08
+
+      always_send_full_costmap: True

@@ -153,16 +153,16 @@ controller_server:
     FollowPath:
       plugin: "nav2_mppi_controller::MPPIController"
 
-      time_steps: 40
+      time_steps: 30
       model_dt: 0.05
-      batch_size: 1500
+      batch_size: 1000
 
       vx_std: 0.3
       vy_std: 0.0
       wz_std: 0.5
 
       vx_max: 1.0
-      vx_min: 0.0
+      vx_min: 0.1
       vy_max: 0.0
       wz_max: 1.5
 
@@ -181,7 +181,7 @@ controller_server:
 
       motion_model: "Ackermann"
 
-      visualize: true
+      visualize: false
       reset_period: 1.0
       regenerate_noises: false
 
@@ -212,12 +212,12 @@ controller_server:
       ObstaclesCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 10.0
+        repulsion_weight: 30.0
         consider_footprint: true
-        collision_margin_distance: 0.15
+        collision_margin_distance: 0.20
         near_goal_distance: 0.5
         inflation_layer_name: "inflation_layer"
-        critical_weight: 30.0
+        critical_weight: 40.0
 
       GoalCritic:
         enabled: true
@@ -240,7 +240,7 @@ controller_server:
       PathAlignCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 15.0
+        cost_weight: 8.0
         max_path_occupancy_ratio: 0.25
         trajectory_point_step: 4
         threshold_to_consider: 0.4
@@ -318,12 +318,13 @@ local_costmap:
         enabled: true
         gaussian_sigma: 0.5
         amplitude: 252.0
-        cutoff_distance: 2.0
+        cutoff_distance: 2.5
+        stale_timeout: 0.5
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.25
+        inflation_radius: 0.35
 
       always_send_full_costmap: True
 

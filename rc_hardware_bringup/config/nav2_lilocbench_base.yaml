@@ -1,0 +1,23 @@
+####################################################################
+# NAV2 COSTMAP OVERLAY — LILOCBENCH ROBOT (Clearpath Dingo)
+#
+# Adjusts footprint, laser range, and camera height for the Dingo
+# platform.  Merged on top of nav2_hardware.yaml (base) and any
+# sensor-specific overlay (da3, sensor_depth, etc.) by the launch file.
+####################################################################
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      footprint: "[[0.27, 0.19], [0.27, -0.19], [-0.27, -0.19], [-0.27, 0.19]]"
+
+      obstacle_layer:
+        scan:
+          sensor_frame: laser
+          obstacle_range: 8.0
+          raytrace_range: 10.0
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      footprint: "[[0.27, 0.19], [0.27, -0.19], [-0.27, -0.19], [-0.27, 0.19]]"

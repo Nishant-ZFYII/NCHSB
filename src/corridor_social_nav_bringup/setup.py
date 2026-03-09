@@ -32,6 +32,7 @@ setup(
             'metrics_logger = corridor_social_nav_bringup.metrics_logger:main',
             'goal_sender = corridor_social_nav_bringup.goal_sender:main',
             'pedestrian_driver = corridor_social_nav_bringup.pedestrian_driver:main',
+            'cmd_vel_logger = corridor_social_nav_bringup.cmd_vel_logger:main',
         ],
     },
 )

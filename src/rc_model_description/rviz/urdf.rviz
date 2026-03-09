@@ -62,6 +62,15 @@ Visualization Manager:
       Color Scheme: map
       Draw Behind: true
 
+    - Class: rviz_default_plugins/Path
+      Name: LocalPlan
+      Enabled: true
+      Topic:
+        Value: /local_plan
+      Color: 255; 0; 255
+      Line Style: Lines
+      Line Width: 0.05
+
     - Class: rviz_default_plugins/Map
       Name: LocalCostmap
       Enabled: true
@@ -69,6 +78,20 @@ Visualization Manager:
         Value: /local_costmap/costmap
       Alpha: 0.5
       Color Scheme: costmap
+
+    - Class: rviz_default_plugins/Map
+      Name: GlobalCostmap
+      Enabled: false
+      Topic:
+        Value: /global_costmap/costmap
+      Alpha: 0.3
+      Color Scheme: costmap
+
+    - Class: rviz_default_plugins/MarkerArray
+      Name: MPPITrajectories
+      Enabled: true
+      Topic:
+        Value: /local_plan_trajectories
 
   Global Options:
     Fixed Frame: map

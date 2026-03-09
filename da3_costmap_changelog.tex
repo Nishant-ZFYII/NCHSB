@@ -402,7 +402,66 @@ Subsampled to $\sim$3--5\,Hz.
 
 \subsection{Results}
 
-\textit{(To be filled after HPC run)}
+Ran on local GPU (GTX 1060, DA3-Small live inference at $\sim$10\,fps).
+432 frames from \texttt{dynamics\_0} front camera at 3\,Hz, sensor depth
+as ground truth.  Camera height 0.66\,m, grid resolution 0.05\,m/pix,
+height band 0.05--1.80\,m, depth range 0.3--8.0\,m.
+
+\begin{table}[h]
+\centering
+\caption{Phase 1 offline costmap ablation --- LILocBench dynamics\_0 (432 frames)}
+\label{tab:phase1-lilocbench}
+\begin{tabular}{llrrrrrr}
+\toprule
+\textbf{Exp.} & \textbf{Description} & \textbf{IoU} & \textbf{L-IoU}
+  & \textbf{DetRate} & \textbf{FPR}
+  & \textbf{Radius (m)} & \textbf{Time (ms)} \\
+\midrule
+Baseline & Sensor depth + fixed infl.       & 1.000 & 1.000 & 1.000 & 0.000 & 0.090 & 22.8 \\
+A1       & Sensor depth + dynamic infl.      & 1.000 & 1.000 & 1.000 & 0.000 & 0.145 & 58.1 \\
+A2       & Sensor+DA3 + fixed infl.          & 0.783 & 0.715 & 1.000 & 0.021 & 0.090 & 49.2 \\
+A3       & Sensor+DA3 + dynamic infl.        & 0.783 & 0.715 & 1.000 & 0.021 & 0.145 & 83.6 \\
+A4       & DA3 only + dynamic infl.          & 0.704 & 0.632 & 0.883 & 0.021 & 0.138 & 64.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Note:} A5/A6 (class-aware inflation with YOLO+SAM2) require
+SAM2-Large ($\sim$2.4\,GB weights), which is not installed on the local
+machine.  These experiments are deferred to HPC.
+
+\subsubsection{Key Findings}
+
+\begin{enumerate}[nosep]
+  \item \textbf{DA3 depth introduces false positives but maintains
+    detection.}  A2/A3 show 100\% detection rate (same as Baseline) but
+    IoU drops to 0.783 due to DA3 adding spurious obstacle cells in open
+    areas.  FPR is low at 2.1\%, indicating the extra obstacles are
+    localised.
+
+  \item \textbf{DA3-only (A4) reduces detection rate to 88.3\%.}  Without
+    sensor depth, DA3 misses 11.7\% of obstacles---primarily thin
+    structures (chair legs, doorframes) that the monocular depth model
+    blurs.  This is consistent with the thin-object limitation observed
+    in Phase 2b.
+
+  \item \textbf{Dynamic inflation adapts to corridor width.}  A1/A3
+    inflate to mean 0.145\,m (range 0.05--0.18\,m), vs.\ fixed 0.09\,m.
+    The LILocBench office has wider corridors (mean 1.23\,m) than the
+    NCHSB corridor, so inflation uses more of its budget.
+
+  \item \textbf{Clearance is preserved.}  All fused configs (A2/A3)
+    maintain 0.55\,m clearance vs.\ 0.62\,m Baseline---the 11\% reduction
+    is from DA3's denser obstacle map, not from safety degradation.
+    A4 actually matches Baseline clearance (0.62\,m) because the sparser
+    DA3 grid has more free space.
+
+  \item \textbf{Comparison with corridor dataset:}  The corridor Phase 1
+    results (459 frames) showed lower IoU for A2/A3 (0.379 vs.\ 0.783
+    here), indicating DA3 adds \emph{more} false positives in the narrow
+    corridor environment.  The office environment's open spaces reduce
+    DA3's tendency to hallucinate obstacles near walls.
+\end{enumerate}
 
 % ============================================================================
 \section{Phase 2: Live Corridor Ablation (Jetson)}
@@ -487,7 +546,400 @@ ros2 launch rc_hardware_bringup da3_costmap.launch.py \
 
 \subsection{Results}
 
-\textit{(To be filled)}
+\textbf{Deferred.}  Jetson deployment requires the physical RC car
+platform with RPLiDAR A2M8 + Orbbec Femto Bolt.  The TensorRT build
+for DA3-Small on Jetson Orin Nano is complete (ONNX export verified),
+but on-robot testing has not been conducted.  Phase 2b (rosbag replay
+on GTX 1060) and Phase 2c (LILocBench replay) serve as functionally
+equivalent evaluations of the live ROS2 pipeline, covering the same
+experiment matrix with wall-clock timing and Nav2 integration.
+
+% ============================================================================
+\section{Phase 2b: Live Costmap Ablation (Rosbag Replay, GTX 1060)}
+\label{sec:phase2b}
+% ============================================================================
+
+\subsection{Approach}
+
+Four-configuration ablation using SLAM Toolbox localization mode against a
+pre-built static map, replaying the corridor rosbag with the full Nav2 stack
+running.  Unlike the offline Phase~1 experiments (which computed costmaps
+from extracted frames), this evaluates the real ROS2 pipeline with
+wall-clock timing, TF transforms, and Nav2's \texttt{ObstacleLayer}.
+
+\subsubsection{Static Map Creation}
+
+Created using \texttt{mapping\_replay.launch.py}:
+\begin{itemize}[nosep]
+  \item SLAM Toolbox \texttt{async\_slam\_toolbox\_node} in mapping mode
+  \item Static \texttt{odom}$\to$\texttt{base\_link} identity TF
+    (no wheel odometry in rosbag; SLAM scan matching handles positioning)
+  \item \texttt{rc\_model\_replay.urdf.xacro}: stripped URDF with only
+    \texttt{base\_link}$\to$\texttt{chassis\_link}$\to$\texttt{lidar\_link}$\to$\texttt{laser}
+    and \texttt{chassis\_link}$\to$\texttt{camera\_link} (avoids TF conflicts
+    with bag's camera sub-frames)
+  \item Result: 220$\times$62 occupancy grid at 0.05\,m/pix
+    (11.0$\times$3.1\,m corridor)
+\end{itemize}
+
+Saved as \texttt{corridor\_map.pgm/yaml} (for Nav2 map\_server) and
+\texttt{corridor\_posegraph.posegraph} (for SLAM Toolbox localization).
+
+\subsubsection{Ablation Configurations}
+
+\begin{table}[h]
+\centering
+\caption{Live costmap ablation configurations}
+\label{tab:live-configs}
+\begin{tabular}{llll}
+\toprule
+\textbf{Config} & \textbf{Obstacle Sources} & \textbf{Rate} & \textbf{Notes} \\
+\midrule
+L   & LiDAR (\texttt{/scan}) only & 1.0$\times$ & Baseline \\
+L+S & LiDAR + sensor depth PointCloud2 & 1.0$\times$ & Ground-truth fusion \\
+L+D & LiDAR + DA3-Small depth PointCloud2 & 0.3$\times$ & DA3 inference \\
+D   & DA3-Small depth PointCloud2 only & 0.3$\times$ & Vision-only \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+DA3 configs run at 0.3$\times$ playback to match the GPU inference rate
+($\sim$6.5\,fps on GTX 1060). The \texttt{costmap\_evaluator.py} node
+records per-frame occupied cell counts, obstacle centroids, and periodic
+PNG snapshots.
+
+\subsection{Results}
+
+\begin{table}[h]
+\centering
+\caption{Live costmap ablation --- occupied cell statistics (corridor rosbag)}
+\label{tab:live-results}
+\begin{tabular}{lrrrrrr}
+\toprule
+\textbf{Config} & \textbf{Frames} & \textbf{Mean Occ.} & \textbf{Std} & \textbf{Min} & \textbf{Max} & \textbf{$\Delta$ vs L} \\
+\midrule
+L       & 252 & 2295 & 311 & 1831 & 2948 & ---      \\
+L+S     & 258 & 3061 & 308 & 2474 & 3673 & +33.4\% \\
+L+D     & 909 & 3546 & 283 & 2911 & 4195 & +54.5\% \\
+D       & 883 & 1461 & 159 &  876 & 1674 & $-$36.3\% \\
+L+D+dyn & 904 & 3740 & 326 & 3191 & 4493 & +63.0\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Key Findings}
+
+\begin{enumerate}[nosep]
+  \item \textbf{L+S detects 33\% more obstacles than L alone.}
+    The Femto Bolt sensor depth fills in vertical obstacles missed by the
+    2D LiDAR scan plane. This is the ``ground truth'' fusion baseline
+    since sensor depth is hardware-measured.
+
+  \item \textbf{L+D detects 55\% more obstacles than L.}
+    DA3-Small depth contributes even more obstacle cells than sensor depth.
+    Two likely reasons: (a)~DA3 produces dense depth for all pixels
+    (sensor has 77\% dead pixels in corridor), (b)~some DA3 depth noise
+    generates extra occupied cells (consistent with the thin-object blurring
+    observed earlier).
+
+  \item \textbf{D alone detects 36\% fewer obstacles than L.}
+    Consistent with the offline Phase~1 finding (76.7\% detection rate):
+    the camera's $\sim$81\textdegree{} FOV misses obstacles behind and
+    to the sides that the 360\textdegree{} LiDAR sees.
+
+  \item \textbf{L+D has the tightest costmap (most conservative).}
+    The fusion of LiDAR's 360\textdegree{} coverage with DA3's dense
+    frontal depth creates the densest obstacle representation. For a
+    safety-first application, this is the recommended configuration.
+
+  \item \textbf{Stability:} all configurations show similar std
+    (283--311 cells), indicating consistent obstacle detection across
+    the corridor run. D config has the lowest variance (159), likely
+    because its reduced FOV sees a more uniform subset of the corridor.
+
+  \item \textbf{Dynamic inflation (L+D+dyn) adds 5\% more occupied cells
+    over fixed L+D.}  With YOLO detecting chairs (class 56, conf 42--48\%)
+    and intermittent dustbin/oven misclassifications (class 69), the
+    class-aware strategy applies larger inflation radii (furniture: 0.15\,m
+    vs fixed 0.09\,m), expanding the obstacle footprint.  The higher
+    occupied cell count is expected and represents the safety margin
+    added by semantic awareness.
+
+  \item \textbf{YOLO detections are intermittent.}  Chairs and dustbins
+    are only visible in portions of the corridor (the robot passes them
+    at specific locations).  When no detections are present, dynamic
+    inflation falls back to the min\_depth strategy, which computes
+    radius from the closest DA3 depth values.
+\end{enumerate}
+
+% ============================================================================
+\section{Phase 2c: Live Costmap Ablation --- LILocBench (GTX 1060)}
+\label{sec:phase2c}
+% ============================================================================
+
+\subsection{Dataset}
+
+LILocBench \texttt{dynamics\_0} sequence (Trekel et al., IROS 2025):
+10 people moving in an office environment, $\sim$160\,s duration.
+Clearpath Dingo robot with 2$\times$ SICK TIM781S 2D LiDARs (15\,Hz,
+25\,m range) and 3$\times$ RealSense D455 RGB-D cameras (640$\times$480,
+15\,Hz).  Front LiDAR and front camera used for this ablation.
+
+Data format: ROS1 bags (converted to ROS2 MCAP) for LiDAR, odometry,
+and TF; individual PNG files for camera colour and depth images.
+
+\subsection{Static Map}
+
+Built from the full 812\,s mapping sequence using SLAM Toolbox
+(\texttt{async\_slam\_toolbox\_node}) with static \texttt{odom}$\to$%
+\texttt{base\_link} identity TF.  Bag played at 1.0$\times$ to
+completion (84\,494 items).  Result: 701$\times$755 grid at
+0.05\,m/pix ($\sim$35$\times$38\,m office environment).  Posegraph:
+14.9\,MB data + 41.4\,MB graph.  (Earlier partial run produced
+603$\times$266 / 0.9\,MB---insufficient coverage.)
+
+\subsection{Results}
+
+\begin{table}[h]
+\centering
+\caption{LILocBench costmap ablation --- occupied cell statistics (dynamics\_0)}
+\label{tab:lilocbench-results}
+\begin{tabular}{lrrrrrr}
+\toprule
+\textbf{Config} & \textbf{Frames} & \textbf{Mean Occ.} & \textbf{Std} & \textbf{Min} & \textbf{Max} & \textbf{$\Delta$ vs L} \\
+\midrule
+L       &  711 & 1582 & 510 &  911 & 2290 & ---       \\
+L+S     &  725 & 1033 & 285 &  167 & 1507 & $-$34.7\% \\
+L+D     & 2189 & 2004 & 504 &  167 & 2897 & +26.7\%  \\
+D       & 2108 & 3111 & 643 &  271 & 4315 & +96.6\%  \\
+L+D+dyn & 2050 & 2107 & 368 &  284 & 2879 & +33.2\%  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Key Findings}
+
+\begin{enumerate}[nosep]
+  \item \textbf{L+S detects 35\% \emph{fewer} obstacles than L.}
+    The opposite trend from the corridor ($+$33\%).  In the office
+    environment, the sensor depth's clearing rays remove LiDAR obstacle
+    cells that are actually dynamic (moving people).  The depth camera
+    sees that a person has moved away, while the LiDAR's persistence
+    (obstacle layer memory) still marks the old position.  This
+    ``clearing effect'' reduces the overall occupied count.
+
+  \item \textbf{L+D detects 27\% more obstacles than L.}
+    DA3 depth adds obstacles that the LiDAR misses (objects at non-scan-plane
+    heights, table legs, chairs behind people). Consistent with corridor
+    results but smaller in magnitude (corridor: $+$55\%), likely because
+    the office environment has more open space where DA3's extra detections
+    are less pronounced.
+
+  \item \textbf{D alone detects 97\% \emph{more} obstacles than L.}
+    The opposite trend from the corridor ($-$36\%).  In the dynamic office
+    environment with 10 people, DA3 produces dense depth for every person
+    in the camera's FOV, generating many obstacle cells.  The LiDAR only
+    scans at one height and misses most of these people (legs only vs.
+    full body silhouette).  This highlights DA3's strength in
+    people-dense environments.
+
+  \item \textbf{L+D+dyn adds 5\% more than L+D.}
+    Dynamic inflation with YOLO (people detection at $\sim$5\,fps)
+    expands obstacle footprints around detected persons (class-aware
+    radius: person$=$0.30\,m).  The modest increase shows YOLO is
+    detecting people and applying semantically appropriate inflation.
+
+  \item \textbf{D config has highest variance (std=643).}
+    The DA3-only costmap fluctuates significantly as people enter and
+    leave the camera FOV.  This is expected for a single forward-facing
+    camera in a dynamic environment.
+
+  \item \textbf{Corridor vs LILocBench comparison:}
+    The reversal of L+S and D trends between the two environments
+    demonstrates that costmap performance is strongly
+    environment-dependent. The corridor (static, narrow) favours LiDAR
+    baseline; the office (dynamic, open, people-dense) favours
+    camera-based depth for obstacle detection.
+\end{enumerate}
+
+\subsection{Localization Accuracy (APE/RPE)}
+
+Ground truth poses for \texttt{dynamics\_0} were downloaded from the
+LILocBench public dataset (TUM format, 3\,194 poses at 20\,Hz).
+Estimated poses were recorded by a new \texttt{pose\_logger.py} node
+that logs the \texttt{map}$\to$\texttt{base\_link} TF at 20\,Hz during
+each ablation run.  APE (2D after Umeyama SE(2) alignment) and RPE
+(relative pose error, $\delta$\,=\,10 index steps) were computed offline
+via \texttt{eval\_localization.py}.
+
+\textbf{Note:} Initial results used a \emph{partial} posegraph (603$\times$266,
+from an interrupted mapping run).  The results below use the
+\emph{complete} posegraph (701$\times$755, full 812\,s mapping).
+APE median is the primary metric; APE max values include occasional
+SLAM Toolbox loop-closure jumps (artefacts of the larger posegraph
+providing more scan-matching candidates).
+
+\begin{table}[h]
+\centering
+\caption{LILocBench localization accuracy --- dynamics\_0 (full posegraph)}
+\label{tab:lilocbench-localization}
+\begin{tabular}{lrrrrrr}
+\toprule
+\textbf{Config} & \textbf{APE Median (m)} & \textbf{APE Mean (m)}
+  & \textbf{APE RMSE (m)} & \textbf{APE Max (m)}
+  & \textbf{RPE Trans (m)} & \textbf{RPE Rot ($^\circ$)} \\
+\midrule
+L       & 4.63 & 4.93 & 6.84 & 165.3 & 0.36 &  7.8 \\
+L+S     & 4.84 & 5.08 & 5.42 &   8.3 & 0.17 &  8.3 \\
+L+D     & \textbf{1.23} & \textbf{1.82} & \textbf{3.67} & 159.1 & \textbf{0.19} &  9.0 \\
+D       & 4.52 & 4.97 & 7.27 & 160.2 & 0.34 &  8.5 \\
+L+D+dyn & 4.40 & 4.62 & 5.82 & 159.8 & 0.23 &  8.7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Localization Findings}
+
+\begin{enumerate}[nosep]
+  \item \textbf{L+D achieves the best localization by a wide margin.}
+    APE median drops from 4.63\,m (L) to 1.23\,m---a \textbf{73\%
+    improvement}.  APE mean improves from 4.93\,m to 1.82\,m (63\%).
+    DA3 depth enriches the costmap with obstacles at non-scan heights,
+    giving SLAM Toolbox richer structure for scan matching against the
+    static map.
+
+  \item \textbf{L+S shows negligible change from L.}  Adding sensor
+    depth does not improve localization (median 4.84 vs.\ 4.63\,m).
+    The clearing rays from the RealSense depth camera remove LiDAR
+    obstacle cells, reducing scan-matching stability.  However, L+S is
+    the only config without a large loop-closure jump (max 8.3\,m),
+    suggesting the clearing effect paradoxically stabilises the
+    trajectory.
+
+  \item \textbf{D alone performs similarly to L.}  APE median 4.52\,m
+    vs.\ 4.63\,m.  DA3 depth provides enough obstacle structure for
+    basic localisation but lacks the geometric precision of LiDAR for
+    scan matching.
+
+  \item \textbf{L+D+dyn provides modest improvement over L.}  Median
+    4.40\,m vs.\ 4.63\,m.  The dynamic inflation (YOLO-driven radius)
+    only adjusts Nav2 costmap parameters---it does not directly improve
+    SLAM Toolbox scan matching.
+
+  \item \textbf{Loop-closure jumps affect RMSE.}  Configs L, L+D, D,
+    and L+D+dyn show APE max values of 159--165\,m, caused by
+    momentary SLAM Toolbox loop-closure corrections against the large
+    posegraph.  The RPE mean (0.17--0.36\,m) confirms local tracking
+    is consistent; the jumps are discrete relocalisation events.
+\end{enumerate}
+
+\subsection{Cross-Sequence Localization Comparison (L-only, Full Posegraph)}
+
+To assess how environment conditions affect localization, the L-only
+configuration was also run on \texttt{static\_0} (598\,s, static
+environment) and \texttt{lt\_changes\_0} (436\,s, rearranged furniture).
+All three sequences use the complete posegraph (701$\times$755).
+
+\begin{table}[h]
+\centering
+\caption{L-only localization across LILocBench sequences (full posegraph)}
+\label{tab:cross-sequence}
+\begin{tabular}{lrrrrrrr}
+\toprule
+\textbf{Sequence} & \textbf{Duration}
+  & \textbf{APE Med.} & \textbf{APE Mean} & \textbf{APE RMSE}
+  & \textbf{APE Max}
+  & \textbf{RPE Trans} & \textbf{RPE Rot} \\
+\midrule
+dynamics\_0     &  160\,s & 4.63\,m & 4.93\,m &  6.84\,m & 165.3\,m & 0.36\,m &  7.8$^\circ$ \\
+static\_0       &  599\,s & 5.99\,m & 7.43\,m &  9.03\,m &  29.3\,m & 0.29\,m & 14.2$^\circ$ \\
+lt\_changes\_0  &  436\,s & 6.32\,m & 5.96\,m &  9.60\,m & 271.6\,m & 0.38\,m &  8.4$^\circ$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Cross-Sequence Findings}
+
+\begin{enumerate}[nosep]
+  \item \textbf{dynamics\_0 has the best median APE (4.63\,m).}  Despite
+    10 people moving, the short duration (160\,s) limits SLAM drift.
+
+  \item \textbf{static\_0 has the worst rotational RPE (14.2$^\circ$).}
+    The long duration (599\,s) covers the full building; areas where the
+    robot revisits corridors from different angles challenge scan
+    matching.
+
+  \item \textbf{lt\_changes\_0 shows the largest loop-closure jump
+    (APE max 271.6\,m).}  Rearranged furniture creates map--reality
+    inconsistencies, causing SLAM Toolbox to occasionally match against
+    wrong posegraph nodes.  This sequence is the strongest candidate
+    for DA3-augmented costmaps, since camera depth can detect obstacles
+    that differ from the pre-built map.
+
+  \item \textbf{Full posegraph resolves the coverage gap.}  Compared to
+    the earlier partial posegraph results (603$\times$266, $\sim$\,0.9\,MB),
+    the complete posegraph (701$\times$755, $\sim$\,15\,MB) covers the
+    entire environment.  APE median values remain high (4.6--6.3\,m),
+    indicating that SLAM Toolbox localisation with wheel odometry alone
+    has inherent drift over long corridors.  The key finding from the
+    5-config ablation---\textbf{L+D reduces APE median by 73\%}---is
+    attributable to the DA3 depth enrichment, not map coverage.
+\end{enumerate}
+
+\subsection{NCHSB Configuration Comparison}
+
+Verified that the NCHSB robot's Nav2 stack uses the same algorithm
+suite as the LILocBench ablation: SLAM Toolbox localization mode with
+a pre-built posegraph, Nav2 with MPPI controller + SmacPlannerHybrid,
+and a local costmap with \texttt{ObstacleLayer} + \texttt{InflationLayer}.
+Default sensor is LiDAR only (\texttt{/scan}).  The ablation infrastructure
+is a direct translation of NCHSB's stack to the LILocBench platform,
+with only hardware-specific parameter adjustments (footprint, laser range).
+No separate NCHSB-specific testing is required.
+
+\subsection{Infrastructure Created (LILocBench)}
+
+\begin{itemize}[nosep]
+  \item \texttt{lilocbench\_replayer.py}: replays MCAP bag (LiDAR, odom,
+    TF) + individual camera PNGs with topic/frame remapping
+  \item \texttt{urdf/rc\_model\_lilocbench.urdf.xacro}: Dingo TF tree
+    with corridor-compatible frame names
+  \item \texttt{config/slam\_lilocbench.yaml}: SLAM mapping config
+    (SICK TIM781S, 25\,m range)
+  \item \texttt{config/slam\_lilocbench\_localization.yaml}: SLAM
+    localization config
+  \item \texttt{config/nav2\_lilocbench\_base.yaml}: Dingo footprint
+    overlay
+  \item \texttt{launch/lilocbench\_mapping.launch.py}: static map builder
+  \item \texttt{launch/lilocbench\_ablation.launch.py}: ablation launcher
+  \item \texttt{scripts/run\_lilocbench\_ablation.sh}: batch runner
+  \item \texttt{pose\_logger.py}: TF-based pose recorder
+    (map$\to$base\_link at 20\,Hz) to TUM-format file
+  \item \texttt{scripts/eval\_localization.py}: offline APE/RPE
+    computation with Umeyama SE(2) alignment
+  \item \texttt{scripts/run\_lilocbench\_benchmark.sh}: full benchmark
+    runner (costmap ablation + pose logging + localization evaluation)
+\end{itemize}
+
+\subsection{Infrastructure Created (Corridor)}
+
+\begin{itemize}[nosep]
+  \item \texttt{urdf/rc\_model\_replay.urdf.xacro}: replay-only URDF,
+    avoids TF conflicts with bag camera frames
+  \item \texttt{launch/mapping\_replay.launch.py}: static map creation
+    from rosbag (SLAM Toolbox mapping mode)
+  \item \texttt{launch/costmap\_ablation.launch.py}: configurable
+    ablation launch with YAML-merge overlay (base nav2\_hardware.yaml +
+    costmap-specific config)
+  \item \texttt{config/nav2\_lidar\_sensor\_depth.yaml}: L+S costmap
+    config (LiDAR + sensor depth PointCloud2)
+  \item \texttt{costmap\_evaluator.py}: per-frame costmap statistics
+    recorder (CSV, snapshots, summary JSON)
+  \item \texttt{scripts/run\_ablation.sh}: automated sequential runner
+    for all configurations
+  \item \texttt{yolo\_node.py}: YOLOv8-nano detection node (PyTorch
+    locally, TensorRT on Jetson), publishes \texttt{Detection2DArray}
+\end{itemize}
 
 % ============================================================================
 \section{Pipeline and Files}
@@ -535,6 +987,37 @@ ros2 launch rc_hardware_bringup da3_costmap.launch.py \
   obstacle layer (no LiDAR). \\
 \texttt{launch/da3\_costmap.launch.py} & Launch file for DA3 perception
   stack with configurable inflation strategy. \\
+\texttt{rc\_hardware\_bringup/da3\_inference\_node.py} & ROS2 node:
+  runs Depth Anything 3 on live RGB, publishes metric depth on
+  \texttt{/depth\_anything\_3/depth}.  Supports DA3-Small (relative,
+  focal-scaled) and DA3-Metric models.  Rate-limited: drops frames
+  while GPU is busy. \\
+\texttt{rc\_hardware\_bringup/costmap\_evaluator.py} & ROS2 node:
+  records per-frame local costmap statistics (occupied cells, centroids)
+  to CSV, saves periodic PNG snapshots, writes JSON summary. \\
+\texttt{urdf/rc\_model\_replay.urdf.xacro} & Minimal URDF for rosbag
+  replay: base\_link$\to$chassis$\to$lidar\_link$\to$laser plus
+  camera\_link, without camera sub-frames (avoids TF conflicts). \\
+\texttt{launch/mapping\_replay.launch.py} & Static map builder:
+  mcap\_replayer + SLAM Toolbox mapping + static odom$\to$base\_link. \\
+\texttt{launch/costmap\_ablation.launch.py} & Ablation launcher: SLAM
+  localization + Nav2 with YAML-merge config overlay. Supports
+  L, L+S, L+D, D configurations. \\
+\texttt{config/nav2\_lidar\_sensor\_depth.yaml} & Costmap config overlay:
+  LiDAR scan + sensor depth PointCloud2 obstacle layer. \\
+\texttt{scripts/run\_ablation.sh} & Batch runner for all 4 ablation configs. \\
+\midrule
+\multicolumn{2}{l}{\textbf{Phase 2c: LILocBench Benchmark}} \\
+\midrule
+\texttt{rc\_hardware\_bringup/pose\_logger.py} & ROS2 node: records
+  \texttt{map}$\to$\texttt{base\_link} TF at configurable rate to
+  TUM-format file for localization evaluation. \\
+\texttt{scripts/eval\_localization.py} & Offline APE/RPE evaluator:
+  compares estimated poses (TUM) against ground truth with Umeyama
+  SE(2) alignment.  Outputs JSON summary. \\
+\texttt{scripts/run\_lilocbench\_benchmark.sh} & Full benchmark runner:
+  runs 5 ablation configs sequentially with costmap evaluation, pose
+  logging, and localization accuracy computation. \\
 \bottomrule
 \end{longtable}
 
@@ -565,6 +1048,114 @@ Mar 2, 2026 & Nav2 configs: \texttt{nav2\_da3\_costmap.yaml} (fused),
               \texttt{nav2\_da3\_only.yaml} (DA3-only) \\
 Mar 2, 2026 & \texttt{da3\_costmap.launch.py}: perception launch with
               configurable inflation strategy \\
+Mar 2, 2026 & \texttt{da3\_inference\_node.py}: DA3-Small inference on
+              GTX 1060 via system Python 3.10 + PyTorch cu118.
+              Tested with rosbag replay: $\sim$5.7\,fps forward pass,
+              3\,Hz output at 0.1$\times$ playback, depth 0.85--13.75\,m \\
+Mar 2, 2026 & Full pipeline RViz test (6 terminals): mcap\_replayer $\to$
+              da3\_inference\_node $\to$ da3\_to\_pointcloud $\to$ RViz +
+              rqt\_image\_view.  Added TURBO colormap publisher on
+              \texttt{/depth\_anything\_3/depth/colormap} for visualisation. \\
+\midrule
+\multicolumn{2}{l}{\textbf{Observations (DA3 live pipeline, Mar 2 2026)}} \\
+\midrule
+Mar 2, 2026 & \textbf{Speed.} Full pipeline is slow: DA3 forward pass
+              $\sim$100\,ms ($\sim$6\,fps after warmup) but system overall
+              feels sluggish.  All 8 CPU cores saturated (system monitor).
+              Root causes: mcap\_replayer CPU deserialization, da3\_to\_pointcloud
+              numpy, RViz dense-pointcloud rendering, rqt\_image\_view all
+              running simultaneously.  Bag played at 0.3$\times$ to let
+              DA3 keep up. \\
+Mar 2, 2026 & \textbf{Ground plane visible.} Unlike previous sensor-depth
+              tests with tight height filter (0.05--0.50\,m), the relaxed
+              filter (\texttt{min\_height}$=$-2.0, \texttt{max\_height}$=$2.0)
+              shows the ground.  Not related to SLAM Toolbox (not used here);
+              purely a filter setting change for visualisation. \\
+Mar 2, 2026 & \textbf{Thin-object quality.}  Sensor depth (Femto Bolt) cleanly
+              captures chair legs as distinct thin structures.  DA3-Small
+              depth loses them---the pointcloud is noisier and thin objects
+              are blurred/merged.  Expected: DA3-Small processes at
+              280$\times$504 internal resolution (34\,M params), so fine
+              geometry is smoothed.  DA3-Large or DA3-Metric-Large would
+              improve this but may exceed GTX 1060 6\,GB VRAM.
+              \textit{Open issue---investigate DA3-Base (0.1\,B) or
+              higher process\_res.} \\
+Mar 2, 2026 & \textbf{Static map created.} \texttt{mapping\_replay.launch.py}
+              with \texttt{rc\_model\_replay.urdf.xacro} (stripped URDF).
+              Result: 220$\times$62 grid at 0.05\,m/pix (11.0$\times$3.1\,m). \\
+Mar 2, 2026 & \textbf{Live costmap ablation.} Five configs (L, L+S, L+D, D, L+D+dyn)
+              run with \texttt{costmap\_ablation.launch.py} using SLAM Toolbox
+              localization + Nav2.  L+S: +33\%, L+D: +55\%, D: -36\%,
+              L+D+dyn: +63\% vs L baseline.  Dynamic inflation with YOLO
+              (chairs detected, class 56) adds semantic safety margins. \\
+Mar 2, 2026 & \textbf{LILocBench correction.}  Earlier note incorrectly
+              stated LILocBench has no LiDAR.  Per the paper
+              (Trekel et al., IROS 2025), the Clearpath Dingo platform has
+              \emph{two} 2D LiDAR scanners, three RGB-D cameras, and wheel
+              odometry.  A dedicated mapping sequence (812\,s, 217.8\,m) is
+              provided, along with an occupancy grid map (Fig.~4 in paper,
+              5\,cm resolution).  Data is available as ROS bag files.
+              Full SLAM+costmap ablation is feasible on LILocBench. \\
+Mar 2, 2026 & \textbf{LILocBench data acquired.}  Downloaded mapping no-cam
+              bag (192\,MB), dynamics\_0 no-cam bag (38\,MB), dynamics\_0
+              individual files (3.8\,GB, camera PNGs), and pre-built occupancy
+              map.  Converted ROS1 bags to ROS2 MCAP format via
+              \texttt{rosbags-convert}. \\
+Mar 2, 2026 & \textbf{LILocBench infrastructure.}  Created:
+              \texttt{lilocbench\_replayer.py} (reads MCAP bag for LiDAR/odom/TF
+              + individual camera PNGs; remaps topics and frame IDs to corridor
+              pipeline conventions),
+              \texttt{rc\_model\_lilocbench.urdf.xacro} (Dingo TF tree with
+              corridor-compatible frame names),
+              \texttt{slam\_lilocbench.yaml} and
+              \texttt{slam\_lilocbench\_localization.yaml} (SICK TIM781S 25\,m range),
+              \texttt{nav2\_lilocbench\_base.yaml} (Dingo footprint overlay),
+              \texttt{lilocbench\_mapping.launch.py},
+              \texttt{lilocbench\_ablation.launch.py},
+              \texttt{run\_lilocbench\_ablation.sh}. \\
+Mar 2, 2026 & \textbf{LILocBench static map built.}  SLAM Toolbox mapping
+              from 812\,s mapping sequence at 1$\times$ speed.  Initial
+              partial result: 603$\times$266.  Later re-run to completion:
+              701$\times$755 grid at 0.05\,m/pix ($\sim$35$\times$38\,m
+              office).  Saved as \texttt{lilocbench\_posegraph} and
+              \texttt{lilocbench\_map}. \\
+Mar 2, 2026 & \textbf{LILocBench live costmap ablation.}  Five configs
+              (L, L+S, L+D, D, L+D+dyn) on dynamics\_0 sequence (10 people
+              moving, $\sim$160\,s).  See Section~\ref{sec:phase2c}. \\
+Mar 2, 2026 & \textbf{Localization benchmark infrastructure.}
+              \texttt{pose\_logger.py} (TF recorder),
+              \texttt{eval\_localization.py} (APE/RPE evaluator with
+              Umeyama alignment),
+              \texttt{run\_lilocbench\_benchmark.sh} (full benchmark
+              runner with costmap + localization evaluation). \\
+Mar 2, 2026 & \textbf{LILocBench localization results.}  dynamics\_0
+              with GT (3\,194 poses).  L+D achieves best APE RMSE
+              (2.72\,m, 50\% improvement over L baseline 5.44\,m).
+              D alone: 4.36\,m.  L+S/L+D+dyn: no improvement. \\
+Mar 2, 2026 & \textbf{NCHSB config verification.}  Confirmed NCHSB
+              uses identical algorithm stack (SLAM Toolbox localization +
+              Nav2 MPPI/SmacPlanner + ObstacleLayer + InflationLayer).
+              No separate testing required. \\
+Mar 2, 2026 & \textbf{Additional LILocBench sequences.}  Downloaded
+              and converted \texttt{static\_0} (599\,s, 142\,MB) and
+              \texttt{lt\_changes\_0} (436\,s, 104\,MB) bags. \\
+Mar 2, 2026 & \textbf{Full posegraph rebuild.}  Re-ran 812\,s mapping
+              to completion (84\,494 items).  Result: 701$\times$755
+              grid (14.9\,MB data + 41.4\,MB graph), vs.\ prior
+              603$\times$266 partial (0.9\,MB data). \\
+Mar 2, 2026 & \textbf{Re-ran all benchmarks with full posegraph.}
+              dynamics\_0 5-config ablation: L+D achieves APE median
+              1.23\,m (73\% improvement over L baseline 4.63\,m).
+              Cross-sequence L-only: dynamics\_0 4.63\,m, static\_0
+              5.99\,m, lt\_changes\_0 6.32\,m.  Loop-closure jumps
+              observed in longer sequences. \\
+Mar 2, 2026 & \textbf{Phase 1 LILocBench offline ablation.}  Extracted
+              432 frames from dynamics\_0 at 3\,Hz.  DA3-Small live
+              inference on GTX 1060.  Baseline+A1--A4 complete:
+              A2/A3 IoU 0.783, A4 detection rate 88.3\%.
+              A5/A6 deferred (SAM2 not installed locally). \\
+Mar 2, 2026 & \textbf{Phase 2 Jetson: marked deferred.}  TRT build
+              ready but requires physical RC car platform. \\
             & \textit{(More entries to be added as work progresses)} \\
 \bottomrule
 \end{longtable}

@@ -49,9 +49,9 @@ class Da3ToPointCloud(Node):
         self._output_frame = output_frame
 
         qos_sensor = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            reliability=ReliabilityPolicy.RELIABLE,
             history=HistoryPolicy.KEEP_LAST,
-            depth=1,
+            depth=5,
         )
 
         depth_topic = self.get_parameter('depth_topic').value

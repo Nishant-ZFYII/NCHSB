@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<!--
+  Replay-only URDF for rosbag-based experiments.
+  Provides the base_link → chassis_link → lidar_link / camera_link chain.
+  Camera sub-frames (depth_frame, color_frame, optical frames) are NOT
+  included here because the rosbag's /tf_static already publishes them,
+  and TF2 does not allow two parents for the same frame.
+  Also adds lidar_link → laser identity so RPLiDAR scans (frame_id=laser)
+  resolve correctly.
+-->
+<robot name="rc_model_replay" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <link name="base_link"/>
+
+  <joint name="base_link_to_chassis" type="fixed">
+    <parent link="base_link"/>
+    <child link="chassis_link"/>
+    <origin xyz="0.18938 0 0" rpy="0 0 1.5707"/>
+  </joint>
+
+  <link name="chassis_link"/>
+
+  <joint name="lidar_joint" type="fixed">
+    <origin xyz="0 0 0.075" rpy="0 0 -1.5707"/>
+    <parent link="chassis_link"/>
+    <child link="lidar_link"/>
+  </joint>
+
+  <link name="lidar_link"/>
+
+  <!-- RPLiDAR driver publishes with frame_id=laser -->
+  <joint name="lidar_to_laser" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="lidar_link"/>
+    <child link="laser"/>
+  </joint>
+
+  <link name="laser"/>
+
+  <joint name="camera_joint" type="fixed">
+    <origin xyz="0.0 0.05 0.08" rpy="0 0 -1.5707"/>
+    <parent link="chassis_link"/>
+    <child link="camera_link"/>
+  </joint>
+
+  <link name="camera_link"/>
+
+</robot>

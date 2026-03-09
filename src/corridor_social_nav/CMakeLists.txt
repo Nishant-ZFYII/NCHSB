@@ -53,6 +53,7 @@ ament_target_dependencies(social_layer
   pluginlib
   geometry_msgs
   tf2_ros
+  tf2_geometry_msgs
 )
 rosidl_get_typesupport_target(social_layer_typesupport ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(social_layer ${social_layer_typesupport})
@@ -72,6 +73,7 @@ ament_target_dependencies(predictive_social_layer
   geometry_msgs
   nav_msgs
   tf2_ros
+  tf2_geometry_msgs
 )
 rosidl_get_typesupport_target(pred_layer_typesupport ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(predictive_social_layer ${pred_layer_typesupport} corridor_frame)

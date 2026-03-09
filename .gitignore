@@ -96,4 +96,5 @@ RUN_COMMANDS.txt
 # ============================================
 results/run_*/
 *.bag
+rosbags/
 

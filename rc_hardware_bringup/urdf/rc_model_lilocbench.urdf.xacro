@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<!--
+  Minimal URDF for LILocBench Dingo robot TF tree during bag replay.
+  Uses corridor-compatible frame names so existing Nav2 costmap configs
+  work without modification.
+
+  Transforms derived from LILocBench transformations.yaml:
+    base_link -> scan_front_link  => base_link -> lidar_link -> laser
+    base_link -> camera_front_*   => base_link -> camera_link -> camera_color_frame -> camera_color_optical_frame
+
+  Camera depth frames share location with camera_link (D455 convention).
+-->
+<robot name="rc_model_lilocbench" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <link name="base_link"/>
+
+  <!-- LiDAR: scan_front_link from LILocBench -->
+  <joint name="base_to_lidar" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <origin xyz="0.30456 -0.00598 0.165"
+            rpy="0 0 0.01921"/>
+  </joint>
+  <link name="lidar_link"/>
+
+  <joint name="lidar_to_laser" type="fixed">
+    <parent link="lidar_link"/>
+    <child link="laser"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="laser"/>
+
+  <!-- Camera: camera_front chain from LILocBench -->
+  <joint name="base_to_camera_link" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <origin xyz="0.09458 0.03710 0.66014"
+            rpy="0.04036 0.00836 -0.00092"/>
+  </joint>
+  <link name="camera_link"/>
+
+  <!-- camera_link -> camera_depth_frame (identity for D455) -->
+  <joint name="camera_depth_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_depth_frame"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="camera_depth_frame"/>
+
+  <!-- camera_link -> camera_color_frame (small baseline offset) -->
+  <joint name="camera_color_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_color_frame"/>
+    <origin xyz="-0.00016 -0.05901 0.00008"
+            rpy="0.00061 -0.00028 0.00487"/>
+  </joint>
+  <link name="camera_color_frame"/>
+
+  <!-- camera_color_frame -> camera_color_optical_frame (90-deg rotation) -->
+  <joint name="camera_color_optical_joint" type="fixed">
+    <parent link="camera_color_frame"/>
+    <child link="camera_color_optical_frame"/>
+    <origin xyz="0 0 0" rpy="-1.5707963 0 -1.5707963"/>
+  </joint>
+  <link name="camera_color_optical_frame"/>
+
+</robot>

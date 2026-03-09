@@ -193,7 +193,7 @@ controller_server:
 
       motion_model: "Ackermann"
 
-      visualize: true           # Enable for tuning/debugging
+      visualize: false
       reset_period: 1.0
       regenerate_noises: false
 

@@ -156,9 +156,9 @@ controller_server:
     FollowPath:
       plugin: "nav2_mppi_controller::MPPIController"
 
-      time_steps: 40
+      time_steps: 30
       model_dt: 0.05
-      batch_size: 1500
+      batch_size: 1000
 
       vx_std: 0.3
       vy_std: 0.0
@@ -184,7 +184,7 @@ controller_server:
 
       motion_model: "Ackermann"
 
-      visualize: true
+      visualize: false
       reset_period: 1.0
       regenerate_noises: false
 
@@ -325,10 +325,11 @@ local_costmap:
         sigma_d_0: 0.2
         k_s: 0.5
         k_d: 0.3
-        max_cost: 252.0
-        cutoff_distance: 4.0
+        max_cost: 160.0
+        cutoff_distance: 2.0
         use_corridor_frame: true
         anisotropic: true
+        stale_timeout: 0.5
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"

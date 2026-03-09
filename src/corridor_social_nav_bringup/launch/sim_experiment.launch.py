@@ -75,17 +75,59 @@ def _spawn_pedestrians(context, *args, **kwargs):
 
 
 def _build_nav2_launch(context, *args, **kwargs):
-    """Deferred construction so we can resolve LaunchConfiguration values."""
+    """Deferred construction so we can resolve LaunchConfiguration values.
+
+    Patches AMCL initial_pose in the params file with a targeted text
+    replacement (NOT yaml.dump, which corrupts parameter types/formatting).
+    If map_yaml is empty, auto-derives it from the world file name
+    (e.g. corridor_straight.sdf -> maps/corridor_straight.yaml).
+    """
+    import re
+    import tempfile
+
     nav2_bringup_share = get_package_share_directory('nav2_bringup')
     controller_config = LaunchConfiguration('controller_config').perform(context)
     map_yaml = LaunchConfiguration('map_yaml').perform(context)
+    spawn_x = LaunchConfiguration('spawn_x').perform(context)
+    spawn_y = LaunchConfiguration('spawn_y').perform(context)
+    spawn_yaw = LaunchConfiguration('spawn_yaw').perform(context)
+
+    if not map_yaml:
+        world_file = LaunchConfiguration('world').perform(context)
+        world_stem = os.path.splitext(os.path.basename(world_file))[0]
+        rc_share = get_package_share_directory('rc_model_description')
+        candidate = os.path.join(rc_share, 'maps', f'{world_stem}.yaml')
+        if os.path.exists(candidate):
+            map_yaml = candidate
+            print(f'[sim_experiment] Auto-resolved map: {map_yaml}')
+        else:
+            print(f'[sim_experiment] WARNING: no map found at {candidate}')
+
+    with open(controller_config, 'r') as f:
+        content = f.read()
+
+    # Replace the initial_pose block under amcl with spawn coordinates
+    content = re.sub(
+        r'(initial_pose:\s*\n\s+x:\s*)[\d.\-]+',
+        r'\g<1>' + spawn_x, content)
+    content = re.sub(
+        r'(initial_pose:\s*\n\s+x:\s*[\d.\-]+\s*\n\s+y:\s*)[\d.\-]+',
+        r'\g<1>' + spawn_y, content)
+    content = re.sub(
+        r'(initial_pose:\s*\n\s+x:\s*[\d.\-]+\s*\n\s+y:\s*[\d.\-]+\s*\n\s+z:\s*[\d.\-]+\s*\n\s+yaw:\s*)[\d.\-]+',
+        r'\g<1>' + spawn_yaw, content)
+
+    patched = tempfile.NamedTemporaryFile(
+        mode='w', suffix='.yaml', prefix='nav2_patched_', delete=False)
+    patched.write(content)
+    patched.close()
 
     nav2_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(nav2_bringup_share, 'launch', 'bringup_launch.py')
         ),
         launch_arguments={
-            'params_file': controller_config,
+            'params_file': patched.name,
             'map': map_yaml,
             'use_sim_time': 'true',
             'autostart': 'true',
@@ -94,12 +136,92 @@ def _build_nav2_launch(context, *args, **kwargs):
     return [nav2_launch]
 
 
+def _resolve_scenario(context, *args, **kwargs):
+    """If a scenario name is provided, load the scenario YAML and
+    override spawn/goal/world/pedestrians arguments automatically."""
+    scenario = LaunchConfiguration('scenario').perform(context)
+    controller = LaunchConfiguration('controller').perform(context)
+
+    if scenario == 'none':
+        return []
+
+    controller_map = {
+        'mppi_vanilla': 'nav2_mppi_vanilla.yaml',
+        'mppi_social_instant': 'nav2_mppi_social_instant.yaml',
+        'mppi_social_pred': 'nav2_mppi_social_pred.yaml',
+        'full': 'nav2_full.yaml',
+    }
+
+    bringup_share = get_package_share_directory('corridor_social_nav_bringup')
+    rc_share = get_package_share_directory('rc_model_description')
+    scenario_path = os.path.join(bringup_share, 'scenarios', f'{scenario}.yaml')
+
+    if not os.path.exists(scenario_path):
+        print(f'[sim_experiment] WARNING: scenario file not found: {scenario_path}')
+        return []
+
+    import yaml as pyyaml
+    with open(scenario_path, 'r') as f:
+        raw = pyyaml.safe_load(f)
+    sc = raw['scenario']
+    robot = sc['robot']
+    seed = int(LaunchConfiguration('seed').perform(context))
+
+    import numpy as np
+    peds_out = []
+    for ped_cfg in sc.get('pedestrians', []):
+        rng = np.random.RandomState(seed + ped_cfg['id'])
+        speed = float(np.clip(
+            rng.normal(ped_cfg['speed']['mean'], ped_cfg['speed'].get('std', 0)),
+            ped_cfg['speed'].get('min', 0), ped_cfg['speed'].get('max', 10)))
+        delay = float(np.clip(
+            rng.normal(ped_cfg['start_delay']['mean'],
+                       ped_cfg['start_delay'].get('std', 0)),
+            ped_cfg['start_delay'].get('min', 0),
+            ped_cfg['start_delay'].get('max', 10)))
+        peds_out.append({
+            'id': ped_cfg['id'],
+            'speed': speed,
+            'start_delay': delay,
+            'waypoints': ped_cfg['waypoints'],
+            'spawn_z': 0.85,
+        })
+
+    config_file = controller_map.get(controller, f'nav2_{controller}.yaml')
+    ctrl_path = os.path.join(rc_share, 'config', config_file)
+
+    from launch.actions import SetLaunchConfiguration
+    actions = [
+        SetLaunchConfiguration('world', sc['world']),
+        SetLaunchConfiguration('spawn_x', str(robot['start']['x'])),
+        SetLaunchConfiguration('spawn_y', str(robot['start']['y'])),
+        SetLaunchConfiguration('spawn_yaw', str(robot['start']['yaw'])),
+        SetLaunchConfiguration('goal_x', str(robot['goal']['x'])),
+        SetLaunchConfiguration('goal_y', str(robot['goal']['y'])),
+        SetLaunchConfiguration('scenario_name', sc['name']),
+        SetLaunchConfiguration('controller_name', controller),
+        SetLaunchConfiguration('timeout_s', str(sc.get('timeout', 120.0))),
+        SetLaunchConfiguration('pedestrians_json', json.dumps(peds_out)),
+    ]
+    if os.path.exists(ctrl_path):
+        actions.append(SetLaunchConfiguration('controller_config', ctrl_path))
+
+    return actions
+
+
 def generate_launch_description():
     rc_pkg = FindPackageShare('rc_model_description')
     bringup_pkg = FindPackageShare('corridor_social_nav_bringup')
     social_nav_pkg = FindPackageShare('corridor_social_nav')
 
     return LaunchDescription([
+        # ── Convenience scenario/controller shortcut ──
+        DeclareLaunchArgument('scenario', default_value='none',
+            description='Scenario name (e.g. head_on_single). Auto-sets world/spawn/goal.'),
+        DeclareLaunchArgument('controller', default_value='mppi_vanilla',
+            description='Controller name (e.g. mppi_social_instant). Auto-sets config.'),
+        OpaqueFunction(function=_resolve_scenario),
+
         # ── World and robot configuration ──
         DeclareLaunchArgument('world', default_value='corridor_straight.sdf'),
         DeclareLaunchArgument('world_name', default_value='default'),
@@ -237,6 +359,15 @@ def generate_launch_description():
             }],
             output='screen',
             on_exit=Shutdown(reason='Trial complete -- metrics written'),
+        ),
+
+        # ── 10a. cmd_vel logger (debug) ──
+        Node(
+            package='corridor_social_nav_bringup',
+            executable='cmd_vel_logger',
+            name='cmd_vel_logger',
+            parameters=[{'use_sim_time': True}],
+            output='screen',
         ),
 
         # ── 10. Goal sender (delayed to let Nav2 initialize) ──

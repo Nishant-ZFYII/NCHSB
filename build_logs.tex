@@ -2858,6 +2858,570 @@ The ``multiple lines'' and ``inflation starts late'' are visible.
 \end{itemize}
 
 % ============================================================
+\section{Day 4: Social Layer Architecture Rework}
+% ============================================================
+
+\logentry{External Review Analysis}
+An external review (ChatGPT) of the social layer behavior identified the following
+issues, largely confirming our internal diagnosis but correcting the proposed fix
+approach:
+
+\begin{enumerate}
+  \item \textbf{Social cost appears too early}: Root cause is that
+    \texttt{gt\_people\_publisher} is omniscient---it publishes all pedestrian
+    poses from Gazebo GT regardless of LiDAR visibility or trial state.
+    Combined with aggressive parameters (\texttt{amplitude: 252},
+    \texttt{cutoff\_distance: 2.0}), the social blob fills half the corridor
+    before the pedestrian is visually proximate.
+  \item \textbf{Ghost/stale social costs (confirmed bug)}: The layer wrote
+    directly into \texttt{master\_grid} with max-merge only. Old social cells
+    were never cleared because:
+    \begin{itemize}
+      \item \texttt{updateBounds()} only expanded around \emph{current} person
+        positions, not previous stamped regions.
+      \item \texttt{reset()} only cleared \texttt{latest\_people\_}, not any
+        cost state.
+      \item There was no internal layer-owned map.
+    \end{itemize}
+  \item \textbf{Critical correction}: The initial fix proposal (``set old cells
+    to FREE in \texttt{master\_grid}'') was \textbf{unsafe}---it would wipe
+    costs from other layers (obstacle, static, inflation). Per Nav2 plugin
+    guidelines, layers must maintain their own internal \texttt{costmap\_} and
+    merge via \texttt{updateWithMax()}.
+  \item \textbf{MPPI control-loop overruns}: Repeated
+    ``\texttt{Control loop missed its desired rate}'' and
+    ``\texttt{Optimizer fail to compute path}'' indicate the controller was
+    computationally overloaded with \texttt{batch\_size: 1500},
+    \texttt{time\_steps: 40}, and \texttt{visualize: true}.
+\end{enumerate}
+
+\logentry{Architectural Fix: SocialLayer and PredictiveSocialLayer}
+Both costmap layer plugins were reworked following the same pattern:
+
+\begin{enumerate}
+  \item \textbf{Changed base class}: \texttt{nav2\_costmap\_2d::Layer} $\to$
+    \texttt{nav2\_costmap\_2d::CostmapLayer}. This provides access to
+    \texttt{resizeMap()}, \texttt{setCost()}, \texttt{getCost()},
+    \texttt{updateWithMax()}, and \texttt{resetMaps()}.
+  \item \textbf{Added \texttt{matchSize()} override}: Resizes the internal
+    costmap to match the master layered costmap dimensions.
+  \item \textbf{Reworked \texttt{updateCosts()}}:
+    \begin{itemize}
+      \item Clear the internal layer map (\texttt{FREE\_SPACE}) in the update
+        region
+      \item Stamp Gaussian costs into the internal map only
+      \item Merge into master via \texttt{updateWithMax(master\_grid, ...)}
+    \end{itemize}
+  \item \textbf{Previous-bounds tracking}: Store
+    \texttt{prev\_min\_x/y/max\_x/y} each cycle. In \texttt{updateBounds()},
+    union current person bounds with previous bounds, ensuring old stamped
+    regions are revisited and cleared.
+  \item \textbf{Stale-message timeout}: If no \texttt{/tracked\_people} update
+    for $>$\texttt{stale\_timeout} (default 0.5\,s), the people state is
+    cleared, causing the layer to produce zero social cost.
+  \item \textbf{\texttt{reset()} now complete}: Clears
+    \texttt{latest\_people\_}, \texttt{has\_prev\_bounds\_}, and calls
+    \texttt{resetMaps()} to zero the internal costmap.
+\end{enumerate}
+
+\logentry{GT People Publisher Robustness}
+\texttt{gt\_people\_publisher.py} updated with:
+\begin{itemize}
+  \item \textbf{Stale model pruning}: Models not updated within
+    \texttt{stale\_timeout} (default 1.0\,s) are removed from the published
+    set, preventing ghost people.
+  \item \textbf{Trial gating}: New parameter \texttt{gate\_on\_trial\_active}
+    (default \texttt{True}). When enabled, the publisher subscribes to
+    \texttt{/trial\_active} and only begins publishing \texttt{TrackedPeople}
+    after receiving the signal. This prevents omniscient social cost before
+    the robot starts navigating.
+\end{itemize}
+
+\logentry{Parameter Tuning (First Test Point)}
+Following the external review's recommended starting point (not my original
+sigma=0.8 proposal):
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Parameter} & \textbf{Old Value} & \textbf{New Value} \\
+\midrule
+\multicolumn{3}{l}{\emph{SocialLayer (instantaneous)}} \\
+\texttt{amplitude} & 252.0 & 160.0 \\
+\texttt{gaussian\_sigma} & 0.5 & 0.45 \\
+\texttt{cutoff\_distance} & 2.0 & 1.2 \\
+\midrule
+\multicolumn{3}{l}{\emph{PredictiveSocialLayer (pred + full configs)}} \\
+\texttt{max\_cost} & 252.0 & 160.0 \\
+\texttt{cutoff\_distance} & 4.0 & 2.0 \\
+\midrule
+\multicolumn{3}{l}{\emph{MPPI (all 4 configs)}} \\
+\texttt{batch\_size} & 1500 & 1000 \\
+\texttt{time\_steps} & 40 & 30 \\
+\texttt{visualize} & true & false \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Rationale}: \texttt{amplitude: 160} is high enough to
+discourage MPPI from crossing the person's immediate vicinity but low enough
+($<$\,LETHAL\_OBSTACLE/2) that MPPI can still find feasible trajectories around
+it. Keeping \texttt{sigma} at 0.45 (close to original 0.5) avoids widening the
+far-field cost. Reducing \texttt{cutoff\_distance} from 2.0\,m to 1.2\,m
+(instantaneous) and 4.0\,m to 2.0\,m (predictive) prevents the Gaussian from
+spanning the entire corridor width. MPPI load reduction addresses the observed
+control-loop overruns.
+
+\logentry{Smoke Test: Ghost Streak Still Visible}
+After the architectural rework, two smoke tests were run with
+\texttt{mppi\_social\_instant}. The ghost streak and a ``purple semicircle
+outside the map'' were still visible. Metrics: \texttt{collision\_count=1},
+\texttt{min\_separation=0.209m}, \texttt{stuck\_time=10.24s},
+\texttt{time\_to\_goal=13.09s}.
+
+\textbf{Root cause identified}: \emph{Rolling-window origin mismatch}.
+The internal \texttt{CostmapLayer} map had its origin set once during
+\texttt{matchSize()}, but for a rolling-window local costmap the master grid's
+origin shifts every cycle as the window follows the robot. Our code called
+\texttt{mapToWorld(i, j, wx, wy)} on the \emph{internal} map (stale origin),
+so the Gaussian was stamped at wrong world coordinates---producing ghost trails
+at shifted positions and semicircles at map boundaries.
+
+\textbf{Fix}: Changed \texttt{mapToWorld()} calls in \texttt{updateCosts()} to
+\texttt{master\_grid.mapToWorld(i, j, wx, wy)}, since the cell indices
+\texttt{(min\_i..max\_i)} are in the master grid's coordinate frame. Also added
+a size-sync check at the top of \texttt{updateCosts()} for safety. Applied to
+both \texttt{SocialLayer} and \texttt{PredictiveSocialLayer}.
+
+\logentry{First Build Verification}
+All three packages (\texttt{corridor\_social\_nav},
+\texttt{corridor\_social\_nav\_bringup}, \texttt{rc\_model\_description})
+rebuilt successfully with zero errors.
+
+\logentry{Smoke Test After Architecture Rework --- Still Failing}
+Ran two smoke tests with \texttt{mppi\_social\_instant} after the
+\texttt{CostmapLayer} rework.
+
+\textbf{Observations}:
+\begin{itemize}
+  \item Ghost streak still visible in RViz.
+  \item Purple social cost sphere appeared \emph{disconnected} from the actual
+    pedestrian position---not centered on the person.
+  \item Social cost appeared as a purple semicircle at the edge of the map,
+    partly outside the costmap boundaries.
+  \item Metrics: \texttt{success=0}, \texttt{collision\_count=1},
+    \texttt{min\_separation=0.154m}, \texttt{stuck\_time=11.5s}
+\end{itemize}
+
+\noindent\textbf{Hypothesis 1 (rolling-window origin mismatch)}: The internal
+\texttt{CostmapLayer}'s origin is set once during \texttt{matchSize()} but the
+rolling-window local costmap shifts its origin every cycle. Calling
+\texttt{this->mapToWorld()} used the stale internal origin, producing wrong
+world coordinates for the Gaussian. \textbf{Fix attempted}: Changed to
+\texttt{master\_grid.mapToWorld(i, j, wx, wy)}.
+
+\textbf{Result}: Did not fix the problem. Ghost streak and position mismatch
+persisted.
+
+\logentry{Root Cause Identified: TF Frame Mismatch}
+After two failed attempts, the \emph{actual} root cause was identified:
+
+\begin{itemize}
+  \item \texttt{gt\_people\_publisher} publishes \texttt{TrackedPeople} with
+    \texttt{header.frame\_id = ``map''}.
+  \item The local costmap operates in the \texttt{odom} frame
+    (\texttt{global\_frame: odom}).
+  \item The social layer took \texttt{person.position.x/y} directly as world
+    coordinates \textbf{without any TF transformation}, effectively mixing
+    \texttt{map}-frame positions with \texttt{odom}-frame cell coordinates.
+  \item The \texttt{map} $\to$ \texttt{odom} transform (published by AMCL)
+    introduces a non-zero offset. The Gaussian was stamped at the
+    \texttt{map}-frame position interpreted as \texttt{odom}-frame coordinates,
+    causing the social blob to appear at a \emph{different physical location}
+    than the actual person.
+  \item This also explained:
+    \begin{itemize}
+      \item \textbf{Ghost streak}: As the \texttt{map}$\to$\texttt{odom}
+        correction changed, old Gaussian stamps appeared at varying wrong
+        positions.
+      \item \textbf{Semicircle at map edge}: Wrong coordinates near costmap
+        boundaries produced clipped artifacts.
+      \item \textbf{``Social cost appears early''}: The social cost was
+        physically present but at the wrong location, making it seem unrelated
+        to the visible pedestrian.
+    \end{itemize}
+\end{itemize}
+
+\noindent\textbf{Key insight}: All three previous ``bugs'' (ghost streak,
+early appearance, semicircle) were \emph{symptoms of a single root cause}:
+the missing TF transformation in the social layer.
+
+\logentry{Fix: TF Transformation in Social Layers}
+Both \texttt{SocialLayer} and \texttt{PredictiveSocialLayer} were updated:
+
+\begin{enumerate}
+  \item Added \texttt{tf2\_ros::Buffer} and \texttt{tf2\_ros::TransformListener}
+    as class members, initialized in \texttt{onInitialize()}.
+  \item Added \texttt{transformPeopleToGlobal()} method that:
+    \begin{itemize}
+      \item Reads the costmap's \texttt{global\_frame} (e.g., \texttt{odom})
+      \item Looks up the TF from the people message's \texttt{frame\_id}
+        (\texttt{map}) to the costmap's \texttt{global\_frame}
+        (\texttt{odom})
+      \item Transforms each person's position (and velocity, for the predictive
+        layer) using \texttt{tf2::doTransform()}
+      \item Short-circuits if \texttt{source\_frame == global\_frame}
+      \item Logs a throttled warning if the transform is unavailable
+    \end{itemize}
+  \item \texttt{updateBounds()} now uses the \emph{transformed} positions for
+    bounds expansion.
+  \item \texttt{updateCosts()} stamps Gaussians using the \emph{transformed}
+    positions, which are now in the costmap's native coordinate frame.
+  \item Added \texttt{tf2\_geometry\_msgs} dependency to both targets in
+    \texttt{CMakeLists.txt}.
+  \item Added startup log line showing \texttt{global\_frame} to confirm the
+    layer knows which frame it's operating in.
+\end{enumerate}
+
+\logentry{Summary of All Social Layer Fix Attempts (Chronological)}
+\begin{center}
+\begin{tabular}{|c|p{5cm}|p{4cm}|c|}
+\hline
+\textbf{\#} & \textbf{What was tried} & \textbf{Why it didn't work} & \textbf{Correct?} \\
+\hline
+1 & Lower amplitude (252$\to$160), increase sigma (0.5$\to$0.8) &
+    Treats symptom (cost too high) but not cause (wrong position) & Partial \\
+\hline
+2 & \texttt{CostmapLayer} rework: internal map + \texttt{updateWithMax()} &
+    Correct architecture but ghost persisted because coordinates were still wrong & Correct arch. \\
+\hline
+3 & Previous-bounds tracking for ghost clearing &
+    Old bounds were in wrong frame too & Correct idea \\
+\hline
+4 & Stale-message timeout (0.5\,s) &
+    Orthogonal improvement, doesn't fix position & Useful \\
+\hline
+5 & GT publisher gating on \texttt{/trial\_active} &
+    Good fix for ``appears early'' but doesn't fix position & Useful \\
+\hline
+6 & \texttt{master\_grid.mapToWorld()} instead of \texttt{this->mapToWorld()} &
+    Fixes one coordinate issue but the \emph{person} coordinates were still in wrong frame & Partial \\
+\hline
+7 & \textbf{TF transform (map $\to$ odom)} &
+    \textbf{Fixes the actual root cause} & \textbf{Root fix} \\
+\hline
+\end{tabular}
+\end{center}
+
+\noindent Parameters adjusted per external review (amplitude=160,
+sigma=0.45, cutoff=1.2 for instant; max\_cost=160, cutoff=2.0 for
+predictive). MPPI load reduced (batch\_size 1500$\to$1000,
+time\_steps 40$\to$30, visualize=false) across all configs.
+
+\logentry{Smoke Test After TF Fix --- Still Wrong Position}
+Even with TF transformation in the social layer, the purple social cost sphere
+appeared disconnected from the pedestrian and ``before the cylinder comes.''
+No \texttt{cannot transform} warnings in the log, so the TF lookup was
+succeeding. But the \emph{transform itself was wrong}.
+
+\textbf{Root cause}: AMCL's \texttt{initial\_pose} was hardcoded to
+\texttt{(0, 0, 0)} in every Nav2 YAML config, while the robot spawns at
+\texttt{(-9, 0, 0)}. The launch file passed \texttt{spawn\_x}/\texttt{spawn\_y}
+to Gazebo for robot spawning but \textbf{never overrode AMCL's initial pose}.
+
+With \texttt{initial\_pose = (0,0,0)} and robot spawning at \texttt{(-9, 0)}:
+\begin{itemize}
+  \item AMCL publishes a \texttt{map$\to$odom} transform that places the robot
+    at \texttt{map(0,0)} instead of \texttt{map(-9, 0)}
+  \item This \textasciitilde9\,m offset corrupts every \texttt{map$\to$odom}
+    transformation
+  \item The social layer's TF lookup succeeds but returns wrong coordinates,
+    placing the Gaussian at $\sim$9\,m from the actual pedestrian position
+  \item AMCL eventually converges toward the correct pose via scan matching,
+    but the initial error is large and slow to correct
+\end{itemize}
+
+\logentry{Fix: Patch AMCL Initial Pose at Launch Time}
+Modified \texttt{sim\_experiment.launch.py}'s \texttt{\_build\_nav2\_launch()}
+to:
+\begin{enumerate}
+  \item Read the Nav2 params YAML file
+  \item Override \texttt{amcl.ros\_\_parameters.initial\_pose} with the actual
+    \texttt{spawn\_x}, \texttt{spawn\_y}, \texttt{spawn\_yaw} values
+  \item Write to a temporary patched YAML file
+  \item Pass the patched file to \texttt{nav2\_bringup}
+\end{enumerate}
+
+This ensures AMCL's initial \texttt{map$\to$odom} transform is correct from
+the very first frame, regardless of which corridor or spawn position is used.
+
+\logentry{Updated Fix Attempt Summary}
+\begin{center}
+\begin{tabular}{|c|p{5cm}|p{4cm}|c|}
+\hline
+\textbf{\#} & \textbf{What was tried} & \textbf{Why it didn't work} & \textbf{Correct?} \\
+\hline
+1 & Lower amplitude, adjust sigma & Treats symptom, not cause & Partial \\
+\hline
+2 & \texttt{CostmapLayer} + \texttt{updateWithMax()} & Correct architecture, wrong coords & Correct \\
+\hline
+3 & Previous-bounds tracking & Old bounds in wrong frame & Correct \\
+\hline
+4 & Stale-message timeout & Orthogonal improvement & Useful \\
+\hline
+5 & GT publisher gating on \texttt{/trial\_active} & Good, doesn't fix position & Useful \\
+\hline
+6 & \texttt{master\_grid.mapToWorld()} & Partial fix for rolling window & Partial \\
+\hline
+7 & TF transform (map $\to$ odom) & Transform itself was wrong because AMCL initial pose was wrong & Root fix \\
+\hline
+8 & \textbf{Patch AMCL initial\_pose = spawn coords} & \textbf{Fixes the TF so fix \#7 works correctly} & \textbf{Root fix} \\
+\hline
+\end{tabular}
+\end{center}
+
+\logentry{Fix \#8 Broke Everything: yaml.dump Corrupted Nav2 Config}
+The \texttt{yaml.safe\_load()} + \texttt{yaml.dump()} approach completely
+reformatted the Nav2 YAML file, likely corrupting parameter types (e.g.,
+\texttt{True}$\to$\texttt{true}), string-quoted arrays (footprint), and
+numeric formatting. Result: on launch, the map and robot appeared at completely
+different positions in RViz---the robot was $\sim$9\,m to the right of the map.
+Nav2 was essentially broken by the reformatted config.
+
+\textbf{Fix \#9}: Replaced \texttt{yaml.dump()} with targeted \texttt{re.sub()}
+regex replacements that only modify the \texttt{initial\_pose} values
+(\texttt{x}, \texttt{y}, \texttt{yaw}) while leaving the rest of the YAML file
+byte-for-byte identical. The patched file is written to a temporary file and
+passed to \texttt{nav2\_bringup}.
+
+Regex verified: correctly transforms
+\texttt{initial\_pose: x: 0.0} $\to$ \texttt{initial\_pose: x: -9.0} without
+affecting any other content.
+
+\logentry{Updated Fix Attempt Summary (Final)}
+\begin{center}
+\begin{tabular}{|c|p{5cm}|p{4cm}|c|}
+\hline
+\textbf{\#} & \textbf{What was tried} & \textbf{Result} & \textbf{Status} \\
+\hline
+1 & Lower amplitude, adjust sigma & Treats symptom, not cause & Partial \\
+\hline
+2 & \texttt{CostmapLayer} + \texttt{updateWithMax()} & Correct architecture & Kept \\
+\hline
+3 & Previous-bounds tracking & Correct idea & Kept \\
+\hline
+4 & Stale-message timeout & Orthogonal improvement & Kept \\
+\hline
+5 & GT publisher gating on \texttt{/trial\_active} & Prevents early publish & Kept \\
+\hline
+6 & \texttt{master\_grid.mapToWorld()} & Rolling window fix & Kept \\
+\hline
+7 & TF transform (map $\to$ odom) & Root fix for coordinates & Kept \\
+\hline
+8 & AMCL initial\_pose via yaml.dump & \textbf{BROKE Nav2 config} & Reverted \\
+\hline
+9 & \textbf{AMCL initial\_pose via regex} & \textbf{Targeted text replace} & \textbf{Current} \\
+\hline
+\end{tabular}
+\end{center}
+
+\logentry{Smoke Test 9 Results (mppi\_social\_instant\_log4)}
+The regex-based AMCL initial pose patching (Fix \#9) worked---AMCL log confirms
+\texttt{Setting pose: -9.000 0.000 0.000}. However, the robot was \emph{still}
+non-functional:
+\begin{itemize}
+  \item \textbf{Error}: ``\texttt{Robot is out of bounds of the costmap!}'' and
+        ``\texttt{Start pose is out of costmap!}'' from the planner, repeated
+        continuously.
+  \item The SmacPlanner never computed a path; the goal feedback showed
+        \texttt{0.00m remaining} (default/uninitialized value).
+  \item The robot did not move at all.
+  \item \textbf{Positive}: The social layer TF transform fix \emph{was} working
+        --- the purple cost sphere correctly tracked the pedestrian cylinder.
+\end{itemize}
+
+\logentry{Root Cause: Map Origin Did Not Include Robot Spawn Position (Fix \#10)}
+The SLAM-generated map \texttt{corridor\_straight.yaml} had:
+\begin{verbatim}
+origin: [-0.982, -1.25, 0]
+\end{verbatim}
+This corresponds to a map X range of $-0.98$ to $+19.27$\,m. The robot spawns
+at $x = -9.0$ in Gazebo world coordinates, which is \textbf{outside the map bounds}.
+
+\textbf{Explanation}: During SLAM mapping, the robot started at \texttt{odom(0, 0)},
+which corresponded to Gazebo world position $(-9, 0)$. The resulting map uses odom
+coordinates, so the corridor spans $x \in [-0.98, 19.27]$ in the map frame. But the
+scenario files specify spawn and goal in \emph{Gazebo world coordinates} ($x = -9$
+and $x = 9$). The AMCL initial pose was now correctly set to $(-9, 0)$ --- but this
+point was outside the map, so the planner could not find the robot.
+
+\textbf{Fix}: Shift the map origin by the robot's Gazebo spawn offset so that map
+coordinates align with Gazebo world coordinates:
+\begin{verbatim}
+origin: [-9.982, -1.25, 0]    (was: [-0.982, -1.25, 0])
+\end{verbatim}
+New map X range: $-9.98$ to $+10.27$\,m. Both spawn $(-9, 0)$ and goal $(9, 0)$
+are now inside the map.
+
+Applied the same fix to all active corridor maps:
+\begin{itemize}
+  \item \texttt{corridor\_doorway.yaml}: $(-0.976, -2.5) \to (-6.976, -2.5)$
+        (spawn $x = -6.0$)
+  \item \texttt{corridor\_tjunction.yaml}: $(-1.48, -1.04) \to (-7.98, -1.04)$
+        (spawn $x = -6.5$)
+\end{itemize}
+
+\logentry{Updated Fix Attempt Summary (Day 5)}
+\begin{center}
+\begin{tabular}{|c|p{5cm}|p{4cm}|c|}
+\hline
+\textbf{\#} & \textbf{What was tried} & \textbf{Result} & \textbf{Status} \\
+\hline
+1--6 & Social layer architecture fixes & See Day 4 log & Kept \\
+\hline
+7 & TF transform (map $\to$ odom) & Root fix for coordinates & Kept \\
+\hline
+8 & AMCL initial\_pose via yaml.dump & BROKE Nav2 config & Reverted \\
+\hline
+9 & AMCL initial\_pose via regex & Correct, but map too small & Kept \\
+\hline
+10 & \textbf{Shift map origin to align with Gazebo world} & \textbf{Spawn \& goal inside map} & \textbf{Current} \\
+\hline
+\end{tabular}
+\end{center}
+
+\logentry{Files Changed (Fix \#10)}
+\begin{enumerate}
+  \item \texttt{src/rc\_model\_description/maps/corridor\_straight.yaml} --- origin shifted by $-9.0$ in $x$
+  \item \texttt{src/rc\_model\_description/maps/corridor\_doorway.yaml} --- origin shifted by $-6.0$ in $x$
+  \item \texttt{src/rc\_model\_description/maps/corridor\_tjunction.yaml} --- origin shifted by $-6.5$ in $x$
+\end{enumerate}
+Packages \texttt{rc\_model\_description} and
+\texttt{corridor\_social\_nav\_bringup} rebuilt successfully.
+
+\logentry{Smoke Test 10: Map Aligned but Robot Did Not Evade (Fix \#10 Verified)}
+After applying Fix \#10, the SLAM map, costmap, LiDAR, and social cost sphere all
+aligned correctly. The robot navigated and received valid paths from the planner.
+\textbf{However}, the robot drove straight through the pedestrian's social cost zone
+without slowing down or deviating. Collision detected at $d = 0.395$\,m.
+
+\textbf{Root Cause}: MPPI critic weight imbalance. The \texttt{ObstaclesCritic}
+(weight 10.0) read social costs of $160/252 \approx 6.35$ per timestep, but the
+\texttt{PathAlignCritic} (weight 15.0) and \texttt{GoalCritic} (weight 8.0) pulled
+the robot rigidly along the planned path through the corridor center. In a $\sim$2\,m
+wide corridor, ALL trajectory samples hit similar social costs, so MPPI could not
+distinguish avoidance alternatives.
+
+\logentry{Fix \#11: MPPI Social Tuning for Corridor Avoidance}
+Parameter changes to \texttt{nav2\_mppi\_social\_instant.yaml}:
+\begin{center}
+\begin{tabular}{|l|c|c|p{5cm}|}
+\hline
+\textbf{Parameter} & \textbf{Old} & \textbf{New} & \textbf{Rationale} \\
+\hline
+social\_layer amplitude & 160 & 252 & Near-max costmap cost; the social zone now
+dominates \\
+\hline
+social\_layer cutoff\_distance & 1.2\,m & 2.5\,m & Robot sees cost gradient earlier,
+wider lateral gradient in corridor \\
+\hline
+social\_layer gaussian\_sigma & 0.45 & 0.5 & Slightly wider spread for smoother
+gradient \\
+\hline
+ObstaclesCritic cost\_weight & 10 & 25 & 2.5$\times$ boost so social costs dominate
+path critics \\
+\hline
+ObstaclesCritic critical\_weight & 30 & 40 & Stronger penalty for near-inscribed
+costs \\
+\hline
+ObstaclesCritic collision\_margin & 0.15 & 0.20 & Slightly larger safety buffer \\
+\hline
+PathAlignCritic cost\_weight & 15 & 8 & Reduced rigidity so MPPI can deviate from
+path center \\
+\hline
+inflation\_radius (local) & 0.25 & 0.35 & More wall clearance, gives robot room to
+deviate \\
+\hline
+\end{tabular}
+\end{center}
+
+\textbf{Expected behavior}: With these changes, the per-timestep social cost from the
+\texttt{ObstaclesCritic} becomes $252/252 \times 25.0 = 25.0$ at the pedestrian
+center, vs.\ $\sim$8.0 for path deviation. MPPI should strongly prefer trajectories
+that slow down or hug the wall. The wider cutoff provides an asymmetric cost gradient
+across the corridor width, enabling wall-hugging rather than center-tracking.
+
+\logentry{Smoke Test 11: Social Costs Still Ignored (Fix \#11 Failed)}
+Result: Collision at $d = 0.446$\,m, \texttt{path\_length\_m} = 8.478\,m. Robot
+navigated the full corridor but did not avoid the pedestrian.
+
+\textbf{Root cause}: Wrong MPPI parameter name.  The \texttt{ObstaclesCritic}
+initialization log reads:
+\begin{verbatim}
+ObstaclesCritic instantiated with 1 power and 40.000000 / 1.500000 weights
+\end{verbatim}
+The second number (\texttt{1.5}) is the \textbf{repulsion\_weight}, which was still
+at its default because the YAML used \texttt{cost\_weight: 25.0} --- but
+Nav2 Humble's MPPI \texttt{ObstaclesCritic} reads
+\texttt{repulsion\_weight}, not \texttt{cost\_weight}. The base
+\texttt{CriticFunction} class defines \texttt{cost\_weight} but it is
+\emph{not} the field used in the non-lethal cost calculation.
+
+With \texttt{repulsion\_weight = 1.5} (default), each timestep social cost was only
+$252 \times 1.5 / 252 = 1.5$---easily overpowered by path-following critics.
+
+\logentry{Fix \#12: Correct Parameter Name + Visual Debugging}
+\begin{enumerate}
+  \item Changed \texttt{cost\_weight: 25.0} to \texttt{repulsion\_weight: 30.0} in
+        \texttt{ObstaclesCritic} section. Per-timestep cost now:
+        $252 \times 30.0 / 252 = 30.0$.
+  \item Enabled \texttt{visualize: true} in MPPI to show candidate trajectories in
+        RViz.
+  \item Added \texttt{/local\_plan} (magenta) path display to
+        \texttt{urdf.rviz}.
+  \item Added \texttt{/local\_plan\_trajectories} (MPPI MarkerArray) display.
+  \item Added \texttt{GlobalCostmap} display (disabled by default, can toggle).
+\end{enumerate}
+
+\textbf{Expected log confirmation}:
+\begin{verbatim}
+ObstaclesCritic instantiated with 1 power and 40.000000 / 30.000000 weights
+\end{verbatim}
+
+\logentry{Smoke Test 12: Wheels Turning, No Lateral Motion (Fix \#12 Confirmed)}
+The \texttt{ObstaclesCritic} log now reads \texttt{40.0 / 30.0} (was \texttt{1.5}).
+MPPI IS commanding steering (user observed wheels turning). However, the robot did
+not actually move laterally. Collision at $d = 0.395$\,m. 384 control loop misses from
+\texttt{visualize: true}.
+
+\textbf{Root cause}: Ackermann kinematics requires forward velocity for steering to
+produce lateral displacement. With \texttt{vx\_min = 0.0}, MPPI generates
+``stop-and-steer'' trajectories: high social cost $\Rightarrow$ near-zero forward
+speed, so steering rotates the wheels but produces no lateral motion. This matches
+the user's teleop observation: keys \texttt{u}/\texttt{o} (forward+turn) work, but
+\texttt{j}/\texttt{l} (pure rotation) do nothing on Ackermann.
+
+\logentry{Fix \#13: Minimum Forward Velocity + Performance Recovery}
+\begin{enumerate}
+  \item \texttt{vx\_min: 0.0 $\to$ 0.1} --- ensures MPPI always maintains forward
+        crawl, so steering produces actual lateral displacement.
+  \item \texttt{visualize: true $\to$ false} --- recovers controller performance
+        (384 $\to$ $\sim$26 missed loops expected).
+  \item Added \texttt{cmd\_vel\_logger} debug node to monitor MPPI's commanded
+        velocities (\texttt{vx}, \texttt{vy}, \texttt{wz}) at 1\,Hz.
+\end{enumerate}
+
+\textbf{Files changed}:
+\begin{itemize}
+  \item \texttt{nav2\_mppi\_social\_instant.yaml}: vx\_min, visualize
+  \item \texttt{cmd\_vel\_logger.py}: new debug node
+  \item \texttt{setup.py}: registered cmd\_vel\_logger entry point
+  \item \texttt{sim\_experiment.launch.py}: added cmd\_vel\_logger node
+\end{itemize}
+
+Ready for smoke test.
+
+% ============================================================
 
 \section*{Future Work / Nice-to-Haves}
 \begin{itemize}

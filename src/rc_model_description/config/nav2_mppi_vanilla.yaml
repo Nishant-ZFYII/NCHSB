@@ -153,9 +153,9 @@ controller_server:
     FollowPath:
       plugin: "nav2_mppi_controller::MPPIController"
 
-      time_steps: 40
+      time_steps: 30
       model_dt: 0.05
-      batch_size: 1500
+      batch_size: 1000
 
       vx_std: 0.3
       vy_std: 0.0
@@ -181,7 +181,7 @@ controller_server:
 
       motion_model: "Ackermann"
 
-      visualize: true
+      visualize: false
       reset_period: 1.0
       regenerate_noises: false
 
