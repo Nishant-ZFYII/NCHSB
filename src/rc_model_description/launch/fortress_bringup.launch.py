@@ -217,12 +217,12 @@ def generate_launch_description():
         name='camera_color_bridge',
         output='screen',
         arguments=[
-            '/camera_color/image@sensor_msgs/msg/Image[gz.msgs.Image',
-            '/camera_color/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+            '/camera_color@sensor_msgs/msg/Image[gz.msgs.Image',
+            '/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
         ],
         remappings=[
-            ('/camera_color/image', '/camera/color/image_raw'),
-            ('/camera_color/camera_info', '/camera/color/camera_info'),
+            ('/camera_color', '/camera/color/image_raw'),
+            ('/camera_info', '/camera/color/camera_info'),
         ],
     )
 
@@ -232,12 +232,10 @@ def generate_launch_description():
         name='camera_depth_bridge',
         output='screen',
         arguments=[
-            '/camera_depth/depth_image@sensor_msgs/msg/Image[gz.msgs.Image',
-            '/camera_depth/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+            '/camera_depth@sensor_msgs/msg/Image[gz.msgs.Image',
         ],
         remappings=[
-            ('/camera_depth/depth_image', '/camera/depth'),
-            ('/camera_depth/camera_info', '/camera/depth/camera_info'),
+            ('/camera_depth', '/camera/depth'),
         ],
     )
 
