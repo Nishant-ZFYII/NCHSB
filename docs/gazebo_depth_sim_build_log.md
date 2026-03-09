@@ -569,6 +569,24 @@ Dead pixel mask uses 8x8 block-level Bernoulli sampling for spatial correlation 
                             runtime switchable
 ```
 
+### Checkpoint 2 Results (2026-03-09)
+
+| Check | Expected | Actual | Status |
+|-------|----------|--------|--------|
+| `/camera/depth_injected` rate | ~2-3 Hz | 3.0 Hz | PASS |
+| Image format | 320x240, 32FC1 | 320x240, 32FC1 | PASS |
+| Profile 0 switch | Logs confirmation | Confirmed | PASS |
+| Profile 1 switch | Logs "DA3-Small" | Confirmed | PASS |
+| Profile 8 switch | Logs "sensor-fail" | Confirmed | PASS |
+| Profile 8 dead pixels | ~77% | 85.2% (77% mask + 37% GT inf = 85% union) | PASS |
+| Valid depth range (profile 8) | 0.3-8.5m | 0.320m-8.496m | PASS |
+
+### Commits (Phase 2)
+
+| Hash | Message |
+|------|---------|
+| `a960d10` | Phase 2: Add depth_error_injector.py with 10 error profiles |
+
 ### Launch Usage
 
 ```bash
