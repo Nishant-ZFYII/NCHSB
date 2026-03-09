@@ -136,22 +136,20 @@ def generate_launch_description():
                          description='Spawn X (m)')
     spawn_yaw      = DeclareLaunchArgument('spawn_yaw', default_value='-1.5078',
                          description='Spawn yaw (rad)')
-    gui_arg        = DeclareLaunchArgument('gui', default_value='false',
-                         description='Launch Gazebo with GUI (true) or server-only (false). '
-                                     'Server-only avoids rendering hang on dual-GPU systems. '
-                                     'Use "ign gazebo -g" in a separate terminal for GUI.')
+    gui_arg        = DeclareLaunchArgument('gui', default_value='true',
+                         description='Launch Gazebo with GUI (true) or server-only (false).')
     enable_cameras_arg = DeclareLaunchArgument('enable_cameras', default_value='false',
                          description='Include camera/depth sensors in URDF. '
                                      'Disabled by default because ogre2 sensor rendering '
-                                     'deadlocks on dual-GPU (Intel+NVIDIA) systems. '
-                                     'When true, LIBGL_ALWAYS_SOFTWARE=1 is set to force '
-                                     'CPU-based software rendering via Mesa llvmpipe.')
+                                     'deadlocks on dual-GPU (Intel+NVIDIA) systems.')
 
-    # Software rendering for camera sensors (dual-GPU workaround).
-    # Forces Mesa llvmpipe (CPU) instead of GPU-accelerated ogre2 which deadlocks
-    # on Intel iGPU + NVIDIA dGPU systems during EGL init for camera sensors.
-    # gpu_lidar works fine with GPU rendering, but camera/depth_camera do not.
-    set_sw_render = SetEnvironmentVariable(name='LIBGL_ALWAYS_SOFTWARE', value='1')
+    # Only force software rendering when cameras are enabled.
+    # gpu_lidar works fine with hardware rendering (default); setting
+    # LIBGL_ALWAYS_SOFTWARE globally breaks it.
+    set_sw_render = SetEnvironmentVariable(
+        name='LIBGL_ALWAYS_SOFTWARE', value='1',
+        condition=IfCondition(LaunchConfiguration('enable_cameras'))
+    )
 
     # Resource paths (models & worlds)
     set_gz_res  = SetEnvironmentVariable(
