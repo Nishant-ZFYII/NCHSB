@@ -142,6 +142,11 @@ def generate_launch_description():
                          description='Include camera/depth sensors in URDF. '
                                      'Disabled by default because ogre2 sensor rendering '
                                      'deadlocks on dual-GPU (Intel+NVIDIA) systems.')
+    depth_profile_arg = DeclareLaunchArgument('depth_profile', default_value='-1',
+                         description='Depth error injection profile (0-9). '
+                                     '-1 = disabled (no injector node). '
+                                     '0=GT, 1=DA3-Small, 2=V4, 3=V5, 4=V6, '
+                                     '5=V7, 6=V8, 7=V9, 8=sensor-fail, 9=DA3+sensor-fail')
 
     # Only force software rendering when cameras are enabled.
     # gpu_lidar works fine with hardware rendering (default); setting
@@ -283,6 +288,26 @@ def generate_launch_description():
         parameters=[ekf_config, {'use_sim_time': True}],
     )
 
+    # Depth error injector: subscribes to /camera/depth (GT from Gazebo),
+    # publishes /camera/depth_injected with noise matching a selected model.
+    # Only launched when depth_profile >= 0 and cameras are enabled.
+    depth_profile_val = LaunchConfiguration('depth_profile')
+    depth_error_injector = Node(
+        package='rc_model_description',
+        executable='depth_error_injector.py',
+        name='depth_error_injector',
+        output='screen',
+        parameters=[{
+            'profile': LaunchConfiguration('depth_profile'),
+            'input_topic': '/camera/depth',
+            'output_topic': '/camera/depth_injected',
+            'use_sim_time': True,
+        }],
+        condition=IfCondition(PythonExpression([
+            "int('", depth_profile_val, "') >= 0"
+        ])),
+    )
+
     # Static map -> odom transform (identity).
     # In sim the odom frame aligns with the world origin, so map=odom.
     # Replace with AMCL when full Nav2 localization is needed (Phase 3).
@@ -329,7 +354,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         world_file, world_name, model_name, use_sim_time, spawn_z, spawn_x, spawn_y, spawn_yaw,
-        gui_arg, enable_cameras_arg,
+        gui_arg, enable_cameras_arg, depth_profile_arg,
         set_sw_render,
         set_gz_res, set_ign_res, set_hospital_models, set_hospital_ign, controllers_yaml,
         gz_launch_server,
@@ -343,6 +368,7 @@ def generate_launch_description():
         gt_pose_bridge,
         ekf_node,
         map_odom_tf,
+        depth_error_injector,
         #world_odom_aligner,
         #gt_tf_bridge
     ])

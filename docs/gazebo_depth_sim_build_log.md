@@ -511,4 +511,79 @@ map → odom → base_link → chassis_link → lidar_link
 | `6a4a8e6` | Fix: RViz fixed frame odom (not map), add camera image displays |
 | `a23eaaa` | Fix: Add static map->odom TF, restore RViz fixed frame to map |
 
-### Ready for Phase 2: Depth Error Injector
+---
+
+## Phase 2: Depth Error Injector (2026-03-09)
+
+### Goal
+
+Write a ROS2 node that subscribes to GT depth from Gazebo (`/camera/depth`) and publishes error-injected depth (`/camera/depth_injected`) using one of 10 error profiles derived from real corridor evaluation data. This enables controlled experiments measuring how navigation performance degrades with depth quality.
+
+### Files Created/Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `scripts/depth_error_injector.py` | **Created** | ROS2 node: subscribes to GT depth, applies depth-bin-specific Gaussian noise + dead pixel mask, publishes injected depth. 10 profiles, runtime-switchable via `ros2 param set`. |
+| `CMakeLists.txt` | **Modified** | Added `install(PROGRAMS scripts/depth_error_injector.py ...)` to install the script as an executable. |
+| `package.xml` | **Modified** | Added `sensor_msgs` and `cv_bridge` exec dependencies. |
+| `launch/fortress_bringup.launch.py` | **Modified** | Added `depth_profile` launch argument (-1=disabled, 0-9=profile). Injector node conditionally launched when `depth_profile >= 0`. |
+
+### Error Profile Design
+
+10 profiles derived from 459-frame corridor benchmark (rosbag `rgbd_imu_20260228_003828_0.mcap`):
+
+| ID | Name | Near RMSE (0.3-1m) | Mid RMSE (1-2m) | Far RMSE (2-4m) | Dead % | Source |
+|----|------|---------------------|------------------|------------------|--------|--------|
+| 0 | GT | 0.0 | 0.0 | 0.0 | 0% | Pass-through |
+| 1 | DA3-Small | 0.158 | 0.486 | 1.320 | 0% | eval_corridor_depth.py |
+| 2 | V4 | 1.434 | 1.182 | 1.283 | 0% | eval_corridor_depth.py |
+| 3 | V5 | 2.361 | 2.0 (est) | 1.469 | 0% | eval_corridor_depth.py + interp |
+| 4 | V6 | 2.262 | 2.0 (est) | 1.5 (est) | 0% | eval_corridor_depth.py + interp |
+| 5 | V7 | 1.982 | 1.453 | 0.732 | 0% | eval_corridor_depth.py |
+| 6 | V8 | 2.368 | 2.1 (est) | 1.6 (est) | 0% | changelog.tex + interp |
+| 7 | V9 | 1.782 | 1.3 (est) | 1.0 (est) | 0% | changelog.tex + interp |
+| 8 | sensor-fail | 0.0 | 0.0 | 0.0 | 77% | Femto Bolt dead pixel ratio |
+| 9 | DA3+sensor-fail | 0.158 | 0.486 | 1.320 | 77% | DA3 noise + sensor dead pixels |
+
+### Noise Model
+
+Per-pixel depth-dependent additive Gaussian noise:
+
+```
+d_injected = d_gt + N(0, sigma(d_gt))
+sigma(d) = near_rmse   if 0.3 <= d < 1.0
+         = mid_rmse    if 1.0 <= d < 2.0
+         = far_rmse    if 2.0 <= d < 4.0
+         = beyond_rmse if d >= 4.0
+         = near_rmse/2 if d < 0.3
+```
+
+Dead pixel mask uses 8x8 block-level Bernoulli sampling for spatial correlation (real sensor dead pixels cluster around glass/specular surfaces). Mask is deterministic per-seed for reproducibility.
+
+### Architecture
+
+```
+/camera/depth (GT, 32FC1) ---> [depth_error_injector] ---> /camera/depth_injected (32FC1)
+                                    |
+                            profile param (0-9)
+                            runtime switchable
+```
+
+### Launch Usage
+
+```bash
+# Without injector (default):
+ros2 launch rc_model_description fortress_bringup.launch.py \
+    world:=corridor_narrow.sdf enable_cameras:=true
+
+# With GT pass-through (profile 0):
+ros2 launch rc_model_description fortress_bringup.launch.py \
+    world:=corridor_narrow.sdf enable_cameras:=true depth_profile:=0
+
+# With DA3-Small noise (profile 1):
+ros2 launch rc_model_description fortress_bringup.launch.py \
+    world:=corridor_narrow.sdf enable_cameras:=true depth_profile:=1
+
+# Switch profile at runtime:
+ros2 param set /depth_error_injector profile 3
+```
