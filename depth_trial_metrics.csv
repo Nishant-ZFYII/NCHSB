@@ -1,0 +1,2 @@
+scenario,controller,seed,success,collision_count,min_separation_m,ttc_violations,shield_interventions_pct,time_to_goal_s,path_length_m,stuck_time_s
+depth_error_sim,mppi_depth_sim,0,0,0,-1.0,0,0.0,0.0,0.0,17.83
