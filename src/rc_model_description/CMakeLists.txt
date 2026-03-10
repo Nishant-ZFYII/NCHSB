@@ -11,6 +11,7 @@ install(DIRECTORY urdf meshes launch rviz config worlds models maps behavior_tre
 # Install Python scripts as executables (depth_error_injector, etc.)
 install(PROGRAMS
   scripts/depth_error_injector.py
+  scripts/run_depth_error_trials.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

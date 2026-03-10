@@ -758,3 +758,51 @@ Same issue as Fix #10 in `build_logs.tex` (social nav project). SLAM map was in 
 | Hash | Message |
 |------|---------|
 | `072ac4c` | Fix: Shift corridor_narrow map origin to align with Gazebo world coords |
+
+---
+
+## Phase 6: Automated Trial Runner (2026-03-09)
+
+### Goal
+
+Write `run_depth_error_trials.py` that automates the full experiment sweep: 10 profiles x N worlds x N seeds, launching `sim_depth_experiment.launch.py` for each trial.
+
+### Files Created/Modified
+
+| File | Action | Description |
+|------|--------|-------------|
+| `scripts/run_depth_error_trials.py` | **Created** | Automated trial runner: loops profiles x worlds x seeds, launches experiments, collects metrics, kills stale processes between trials. |
+| `CMakeLists.txt` | **Modified** | Added `run_depth_error_trials.py` to install list. |
+
+### Usage
+
+```bash
+# Dry run (print plan without executing):
+python3 run_depth_error_trials.py --dry_run
+
+# Quick checkpoint (2 profiles x 1 trial):
+python3 run_depth_error_trials.py --profiles 0 1 --num_seeds 1 --gui true
+
+# Full sweep (10 profiles x 5 trials, headless):
+python3 run_depth_error_trials.py --num_seeds 5 --gui false
+
+# Specific profiles:
+python3 run_depth_error_trials.py --profiles 0 1 7 8 --num_seeds 3
+```
+
+### Output Structure
+
+```
+depth_sim_results/YYYYMMDD_HHMMSS/
+├── data/          # Per-trial metrics CSV
+├── logs/          # Per-trial launch logs
+└── summary.csv    # Aggregated results
+```
+
+### Features
+
+- Kills stale Gazebo/ROS processes between trials
+- Headless mode (`--gui false`) for unattended runs
+- Interruptible with Ctrl+C (writes partial summary)
+- Per-trial timeout with configurable max wait
+- Summary CSV updated after each trial (crash-safe)
