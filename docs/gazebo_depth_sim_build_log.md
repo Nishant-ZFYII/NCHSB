@@ -725,3 +725,36 @@ Add furniture, a glass panel, and a reflective floor patch to the corridor world
 | Hash | Message |
 |------|---------|
 | `a61e9e4` | Phase 4: Add furnished corridor world with glass + reflective floor |
+
+---
+
+## Phase 5: First Autonomous Nav Trial (2026-03-09)
+
+### Goal
+
+Send a Nav2 goal from one end of the furnished corridor to the other using GT depth (profile 0) and verify the robot navigates autonomously without collision.
+
+### Issue: Map Origin Not Aligned with Gazebo World
+
+Same issue as Fix #10 in `build_logs.tex` (social nav project). SLAM map was in odom coordinates starting at (0,0), but robot spawns at Gazebo world (-6.5, 0). AMCL's initial_pose was correctly patched to (-6.5, 0) by the regex in `sim_depth_experiment.launch.py`, but that point was outside the map.
+
+**Fix:** Shifted `corridor_narrow.yaml` origin from `[-0.992, -1, 0]` to `[-7.492, -1, 0]` (shifted by -6.5 in x). Map now covers x=-7.49 to x=7.51 in Gazebo world coordinates. Applied same fix to `corridor_narrow_furnished.yaml`.
+
+### Checkpoint 5 Results
+
+| Metric | Value |
+|--------|-------|
+| Success | 1 (reached goal) |
+| Collisions | 0 |
+| Time to goal | 18.68 s |
+| Path length | 12.19 m |
+| Corridor length | 12.5 m (x=-6.5 to x=6.0) |
+| Stuck time | 11.37 s |
+| Depth profile | 0 (GT pass-through) |
+| World | corridor_narrow_furnished.sdf |
+
+### Commits (Phase 5)
+
+| Hash | Message |
+|------|---------|
+| `072ac4c` | Fix: Shift corridor_narrow map origin to align with Gazebo world coords |
