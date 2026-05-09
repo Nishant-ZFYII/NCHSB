@@ -1,6 +1,11 @@
 # NCHSB — High-Speed Narrow-Corridor Autonomous Racing
 
-> Autonomous high-speed navigation for an Ackermann-steered RC car through narrow indoor corridors with **~20–30 cm wall clearance**. Built on ROS 2 Humble + Gazebo Sim, targeting sim-to-real deployment on a modified Traxxas Maxx 4S platform.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![ROS 2 Humble](https://img.shields.io/badge/ROS%202-Humble-22314E.svg?logo=ros&logoColor=white)](https://docs.ros.org/en/humble/)
+[![Gazebo Sim](https://img.shields.io/badge/Gazebo-Sim-orange.svg)](https://gazebosim.org/)
+[![Top language](https://img.shields.io/github/languages/top/Nishant-ZFYII/NCHSB.svg)](https://github.com/Nishant-ZFYII/NCHSB)
+
+> High-speed autonomous racing through narrow indoor corridors at up to **~10 m/s** with **~20–30 cm wall clearance**. ROS 2 Humble + Nav2 MPPI + Gazebo Sim, with an **emergency-MPC fallback** when collision becomes inevitable, and an explicit **Human > Object > Wall** ethical cost hierarchy. Sim-to-real targeting **Traxxas Maxx 4S + Jetson Orin Nano**.
 
 <p align="center">
   <img src="docs/media/corridor_navigation.gif" width="80%" alt="Corridor navigation demo"/>
@@ -165,6 +170,12 @@ IMU + wheel odom ──→ EKF ──→ odom→base_link TF ────┘
 </p>
 
 See also [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for narrative documentation.
+
+---
+
+## Author
+
+Nishant Pushparaju · nishantpushparaju@gmail.com · [github.com/Nishant-ZFYII](https://github.com/Nishant-ZFYII)
 
 ---
 
